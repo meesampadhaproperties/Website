@@ -66,3 +66,32 @@ test('Action access: view vs edit requirements', () => {
   assert.strictEqual(isAllowed('edit', 'view'), true);
   assert.strictEqual(isAllowed('none', 'view'), false);
 });
+
+// Mirrors app/crm/reports/leads-export.ts → csvSafe (spreadsheet formula injection, CWE-1236)
+function csvSafe(value) {
+  const str = String(value ?? '');
+  return /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+}
+
+test('CSV export: neutralises formula-leading values from public lead forms', () => {
+  assert.strictEqual(csvSafe('=HYPERLINK("http://evil.example")'), `'=HYPERLINK("http://evil.example")`);
+  assert.strictEqual(csvSafe('+1+1'), "'+1+1");
+  assert.strictEqual(csvSafe('-2+3'), "'-2+3");
+  assert.strictEqual(csvSafe('@SUM(A1)'), "'@SUM(A1)");
+  assert.strictEqual(csvSafe('\tcmd'), "'\tcmd");
+});
+
+test('CSV export: leaves normal values untouched', () => {
+  assert.strictEqual(csvSafe('Ravi Kumar'), 'Ravi Kumar');
+  assert.strictEqual(csvSafe(null), '');
+  assert.strictEqual(csvSafe(9876543210), '9876543210');
+});
+
+// Mirrors app/crm/leads/actions.ts source-filter sanitiser
+const cleanSource = (s) => String(s).replace(/[^a-z0-9_ -]/gi, '').trim();
+
+test('Leads source filter: strips PostgREST filter delimiters', () => {
+  assert.strictEqual(cleanSource('meta,status.eq.new'), 'metastatuseqnew');
+  assert.strictEqual(cleanSource('a),(b'), 'ab');
+  assert.strictEqual(cleanSource('facebook'), 'facebook');
+});

@@ -21,6 +21,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  // Phones scroll the document itself: freeze it while the slide-out menu is open
+  useEffect(() => {
+    if (!isMobileMenuOpen) return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [isMobileMenuOpen])
   const [isNavigating, setIsNavigating] = useState(false)
 
   const [userRole, setUserRole] = useState<string>('')
@@ -115,7 +122,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const companyName = COMPANY_NAME
 
   return (
-    <div className="flex h-[100dvh] min-h-[100dvh] w-full bg-[#f7f8fa] overflow-hidden">
+    <div className="flex min-h-[100dvh] w-full bg-[#f7f8fa] md:h-[100dvh] md:overflow-hidden">
+      {/* Phones: the browser scrolls the page itself (no inner scroll box), so mobile toolbars collapse and nothing is left unpainted.
+          md: and up: fixed-height shell with <main> as the scroll area beside the sidebar. */}
       {/* Mobile Top Bar */}
       <div className="md:hidden flex items-center justify-between bg-white/95 backdrop-blur-md border-b border-[#e8ecf2] h-16 px-4 shrink-0 fixed top-0 left-0 right-0 z-30 shadow-xs">
         <Link href="/crm" className="flex items-center gap-2 font-black text-lg tracking-wider text-[#0f1d33]" onClick={() => setIsMobileMenuOpen(false)}>
@@ -164,8 +173,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden p-3.5 sm:p-5 md:p-8 pt-20 md:pt-8 w-full flex flex-col min-h-0 relative">
-        <div className="mx-auto max-w-7xl w-full flex-1 flex flex-col min-h-0">
+      <main className="flex-1 min-w-0 overflow-x-clip md:overflow-x-hidden md:overflow-y-auto p-3.5 sm:p-5 md:p-8 pt-20 md:pt-8 w-full flex flex-col md:min-h-0 relative">
+        {/* shrink-0 (no min-h-0): the wrapper grows with the page; a viewport-locked wrapper let pages overflow it, which mobile browsers left unpainted (cut-off bottom) */}
+        <div className="mx-auto max-w-7xl w-full flex-1 shrink-0 flex flex-col">
           {isNavigating ? (
             <div className="flex h-[60vh] w-full flex-col items-center justify-center gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white border border-[#e8ecf2] shadow-sm">

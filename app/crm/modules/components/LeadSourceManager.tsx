@@ -226,10 +226,10 @@ export default function LeadSourceManager({ initialSources }: LeadSourceManagerP
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-[#f8fafc] border-b border-[#e8ecf2] text-[11px] font-semibold text-[#5a6a82] uppercase tracking-wider">
-              <th className="py-3 px-4">Source Name</th>
-              <th className="py-3 px-4">Identifier Key</th>
-              <th className="py-3 px-4 text-right">Actions</th>
+            <tr className="bg-[#f8fafc] border-b border-[#e8ecf2] text-[11px] font-semibold text-[#5a6a82] uppercase tracking-normal sm:tracking-wider">
+              <th className="py-3 px-2 sm:px-4">Source</th>
+              <th className="py-3 px-2 sm:px-4">Key</th>
+              <th className="py-3 px-2 sm:px-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#e8ecf2] text-sm">
@@ -242,7 +242,7 @@ export default function LeadSourceManager({ initialSources }: LeadSourceManagerP
             ) : (
               paginatedSources.map((src) => (
                 <tr key={src.id} className="hover:bg-[#f8fafc] transition-colors">
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-2 sm:px-4">
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border bg-[#f3f5f8] text-[#0f1d33] border-[#e8ecf2]">
                       {src.name}
                       {src.is_system && (
@@ -252,14 +252,14 @@ export default function LeadSourceManager({ initialSources }: LeadSourceManagerP
                       )}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-xs font-mono text-[#5a6a82]">
+                  <td className="py-3 px-2 sm:px-4 text-xs font-mono text-[#5a6a82] break-all">
                     {src.key}
                   </td>
-                  <td className="py-3 px-4 text-right">
-                    <div className="inline-flex items-center justify-end gap-1.5">
+                  <td className="py-3 px-2 sm:px-4 text-right">
+                    <div className="inline-flex items-center justify-end gap-0.5 sm:gap-1.5">
                       <button
                         onClick={() => openEditModal(src)}
-                        className="p-1.5 text-[#5a6a82] hover:text-[#1e3a5f] hover:bg-[#f3f5f8] rounded-md transition-colors"
+                        className="p-2.5 sm:p-1.5 text-[#5a6a82] hover:text-[#1e3a5f] hover:bg-[#f3f5f8] rounded-md transition-colors"
                         title="Edit source"
                         aria-label="Edit source"
                       >
@@ -268,7 +268,7 @@ export default function LeadSourceManager({ initialSources }: LeadSourceManagerP
 
                       {src.is_system ? (
                         <span 
-                          className="p-1.5 text-[#94a3b8] opacity-50 cursor-not-allowed inline-flex items-center"
+                          className="p-2.5 sm:p-1.5 text-[#94a3b8] opacity-50 cursor-not-allowed inline-flex items-center"
                           title="System default source cannot be deleted"
                         >
                           <Lock className="w-3.5 h-3.5" />
@@ -276,7 +276,7 @@ export default function LeadSourceManager({ initialSources }: LeadSourceManagerP
                       ) : (
                         <button
                           onClick={() => initiateDelete(src)}
-                          className="p-1.5 text-[#5a6a82] hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          className="p-2.5 sm:p-1.5 text-[#5a6a82] hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                           title="Delete source"
                           aria-label="Delete source"
                         >

@@ -158,7 +158,7 @@ export default function BulkSenderClient({
 
       {/* Selection bar */}
       {canSend && (
-        <div className={`sticky top-0 z-20 flex flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${selected.size ? 'border-[#1e3a5f]/30 bg-[#eef4ff]' : 'border-[#e8ecf2] bg-white'}`}>
+        <div className={`sticky top-16 md:top-0 z-20 flex flex-col gap-2 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between ${selected.size ? 'border-[#1e3a5f]/30 bg-[#eef4ff]' : 'border-[#e8ecf2] bg-white'}`}>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
             <span className="font-semibold text-[#0f1d33]">{selected.size ? `${selected.size} selected` : 'No leads selected'}</span>
             {count > leads.length && (

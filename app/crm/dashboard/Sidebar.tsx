@@ -21,7 +21,8 @@ import {
   Building2,
   UserCheck,
   Loader2,
-  Megaphone
+  Megaphone,
+  Globe
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
@@ -140,6 +141,13 @@ export function Sidebar({
       icon: FolderKanban,
     },
     {
+      id: 'website_projects',
+      title: 'Website Projects',
+      href: '/crm/website-projects',
+      icon: Globe,
+      perm: 'projects', // same access as Projects (its documents are the downloads)
+    },
+    {
       id: 'inbox',
       title: 'Inbox',
       href: '/crm/inbox',
@@ -184,7 +192,8 @@ export function Sidebar({
     }
     if (userRole === 'Super Admin') return true;
     if (!userPermissions) return false;
-    const access = userPermissions[item.id] || (item.id === 'inbox' ? userPermissions['whatsapp'] : undefined);
+    const permKey = (item as { perm?: string }).perm || item.id;
+    const access = userPermissions[permKey] || (item.id === 'inbox' ? userPermissions['whatsapp'] : undefined);
     return access !== 'none';
   });
 

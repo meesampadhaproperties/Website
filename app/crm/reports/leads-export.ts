@@ -20,6 +20,16 @@ export const EXPORTABLE_COLUMNS: ExportColumnDef[] = [
   { key: 'created_at', label: 'Created At', defaultSelected: true },
 ];
 
+/**
+ * Neutralises spreadsheet formula injection (CWE-1236): lead fields come from public forms, so a value
+ * starting with = + - @ (or tab/CR) would otherwise run as a formula when the CSV is opened in Excel/Sheets.
+ * A leading apostrophe makes the cell plain text.
+ */
+export function csvSafe(value: unknown): string {
+  const str = String(value ?? '');
+  return /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+}
+
 export async function exportLeadsToCSV(leads: any[], columns: string[], fileName = 'leads_export.csv') {
   const colDefs = columns.map((c) => EXPORTABLE_COLUMNS.find((def) => def.key === c)?.label || c);
 
@@ -37,7 +47,7 @@ export async function exportLeadsToCSV(leads: any[], columns: string[], fileName
             val = d.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
           }
         }
-        return `"${String(val).replace(/"/g, '""')}"`;
+        return `"${csvSafe(val).replace(/"/g, '""')}"`;
       })
       .join(',');
   });

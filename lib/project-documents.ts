@@ -1,5 +1,8 @@
 export const PROJECT_DOCUMENTS_BUCKET = 'project-documents'
 
+/** Document names are also the website's download button labels (REQ-109): short enough for one line on a phone. */
+export const DOCUMENT_NAME_MAX_CHARS = 30
+
 /**
  * Removes every stored file belonging to a project's documents.
  * Call BEFORE deleting the project row (the DB rows cascade, storage objects do not).

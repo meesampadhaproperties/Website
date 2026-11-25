@@ -275,6 +275,48 @@ html.crm-dark .border-cyan-100{border-color:rgba(6,182,212,.35)}
 html.crm-dark .border-cyan-200{border-color:rgba(6,182,212,.35)}
 html.crm-dark .border-cyan-300{border-color:rgba(6,182,212,.35)}
 
+/* Dark theme gap-fill: light colours used by components that the list above did not cover
+   (search boxes, sticky "hover" on phones, WhatsApp chat view, gradient banners). */
+html.crm-dark .bg-\[\#f9fafb\]{background-color:#0b1322}
+html.crm-dark .bg-\[\#fafbfc\]\/80{background-color:rgba(11,19,34,.8)}
+html.crm-dark .bg-\[\#f0f7f9\]{background-color:#1a2538}
+html.crm-dark .bg-\[\#f0f4f9\]{background-color:#1a2538}
+html.crm-dark .bg-\[\#edf2f7\]{background-color:#1a2538}
+html.crm-dark .bg-\[\#e2e8f0\]{background-color:#1a2538}
+html.crm-dark .hover\:bg-\[\#f7f8fa\]:hover{background-color:#1a2538}
+html.crm-dark .hover\:bg-\[\#edf2f7\]:hover{background-color:#223049}
+html.crm-dark .hover\:bg-\[\#f1f5f9\]:hover{background-color:#223049}
+html.crm-dark .hover\:bg-\[\#f1f4f8\]:hover{background-color:#223049}
+html.crm-dark .hover\:bg-\[\#e2e8f0\]:hover{background-color:#223049}
+html.crm-dark .hover\:bg-\[\#f8fafc\]\/50:hover{background-color:rgba(34,48,73,.5)}
+html.crm-dark .from-\[\#f0f6ff\]{--tw-gradient-from:#16233d}
+html.crm-dark .from-\[\#f8fafc\]{--tw-gradient-from:#111a2b}
+html.crm-dark .via-\[\#f1f5f9\]{--tw-gradient-via:#16233d}
+html.crm-dark .to-\[\#f8fafd\]{--tw-gradient-to:#111a2b}
+html.crm-dark .to-\[\#eef4ff\]{--tw-gradient-to:#16233d}
+html.crm-dark .border-\[\#d8e0ea\]{border-color:#2a3750}
+html.crm-dark .border-\[\#d5dce6\]{border-color:#2a3750}
+html.crm-dark .border-\[\#d8e2ed\]{border-color:#2a3750}
+html.crm-dark .border-\[\#f0f3f7\]{border-color:#2a3750}
+html.crm-dark .border-\[\#eef2f6\]{border-color:#2a3750}
+html.crm-dark .border-\[\#c7d9f8\]{border-color:rgba(59,130,246,.35)}
+html.crm-dark .border-\[\#dbe6f8\]{border-color:rgba(59,130,246,.35)}
+html.crm-dark .border-\[\#d0e1fd\]{border-color:rgba(59,130,246,.35)}
+html.crm-dark .border-\[\#c3e8bd\]{border-color:rgba(34,197,94,.35)}
+html.crm-dark .border-\[\#c3e8bd\]\/60{border-color:rgba(34,197,94,.3)}
+html.crm-dark .hover\:border-\[\#cbd5e1\]:hover{border-color:#3a4a66}
+html.crm-dark .hover\:border-\[\#e8ecf2\]:hover{border-color:#3a4a66}
+html.crm-dark .hover\:border-\[\#e2e8f0\]:hover{border-color:#3a4a66}
+html.crm-dark .text-\[\#1a2d4c\]{color:#e6ebf3}
+html.crm-dark .text-\[\#475569\]{color:#c3cede}
+html.crm-dark .text-\[\#025c4c\]{color:#34d399}
+html.crm-dark .text-\[\#dc2626\]{color:#f87171}
+/* WhatsApp chat history view */
+html.crm-dark .bg-\[\#efeae2\]{background-color:#0b141a}
+html.crm-dark .bg-\[\#d9fdd3\]{background-color:#005c4b}
+html.crm-dark .hover\:bg-\[\#d9fdd3\]:hover{background-color:#006d5a}
+html.crm-dark .text-\[\#111b21\]{color:#e9edef}
+
 /* Public site: roofline draws itself once on page load (REQ: single orchestrated moment). */
 .roofline path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: roofline-draw 2.2s ease-out 0.2s forwards; }
 @keyframes roofline-draw { to { stroke-dashoffset: 0; } }

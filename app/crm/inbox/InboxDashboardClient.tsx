@@ -966,7 +966,7 @@ export default function InboxDashboardClient({
   };
 
   return (
-    <div className="flex flex-col min-h-full bg-[#f7f8fa] overflow-y-auto md:overflow-hidden md:h-full">
+    <div className="flex flex-col min-h-full bg-[#f7f8fa] md:overflow-hidden md:h-full">
       {enquiryLead && (
         <EnquiryHistoryDialog lead={enquiryLead} onClose={() => setEnquiryLead(null)} />
       )}
@@ -983,7 +983,7 @@ export default function InboxDashboardClient({
         />
       )}
       {/* Header Bar */}
-      <div className="p-4 md:p-8 pb-4 md:pb-5 flex-shrink-0">
+      <div className="px-0 pt-1 pb-4 md:p-8 md:pb-5 flex-shrink-0">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-bold text-[#0f1d33] flex flex-wrap items-center gap-2.5">
@@ -1019,18 +1019,18 @@ export default function InboxDashboardClient({
       </div>
 
       {/* Main Inbox Table Container */}
-      <div className="flex-1 px-4 md:px-8 pb-4 md:pb-8 flex flex-col min-h-0">
+      <div className="flex-1 px-0 md:px-8 pb-4 md:pb-8 flex flex-col min-h-0">
         {/* Filter Bar (Reference from Lead Pipeline) */}
         <div className="bg-white rounded-xl border border-[#e8ecf2] p-4 shadow-xs mb-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shrink-0">
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto min-w-0">
             {/* Date Range Pills (IST) */}
-            <div className="flex items-center gap-1 bg-[#f3f5f8] border border-[#e8ecf2] rounded-lg p-1 overflow-x-auto max-w-full" role="group" aria-label="Date range">
+            <div className="grid grid-cols-3 sm:flex w-full sm:w-auto items-center gap-1 bg-[#f3f5f8] border border-[#e8ecf2] rounded-lg p-1" role="group" aria-label="Date range">
               {DATE_RANGE_OPTIONS.map(opt => (
                 <button
                   key={opt.value}
                   onClick={() => handleDateRangeChange(opt.value)}
                   disabled={isPageLoading}
-                  className={`px-2.5 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer disabled:cursor-wait ${selectedDateRange === opt.value ? 'bg-[#0f1d33] text-white shadow-xs' : 'text-[#5a6a82] hover:bg-white hover:text-[#0f1d33]'}`}
+                  className={`min-h-[40px] sm:min-h-0 px-1.5 sm:px-2.5 py-1.5 rounded-md text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer disabled:cursor-wait ${selectedDateRange === opt.value ? 'bg-[#0f1d33] text-white shadow-xs' : 'text-[#5a6a82] hover:bg-white hover:text-[#0f1d33]'}`}
                   aria-pressed={selectedDateRange === opt.value}
                 >
                   {opt.label}
@@ -1042,16 +1042,16 @@ export default function InboxDashboardClient({
             <div className="hidden sm:block w-px h-5 bg-[#e8ecf2]" />
 
             {/* Select Project Dropdown */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#5a6a82] shrink-0 whitespace-nowrap select-none flex items-center gap-1.5">
+            <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#5a6a82] w-[84px] sm:w-auto shrink-0 whitespace-nowrap select-none flex items-center gap-1.5">
                 <FolderKanban className="w-3.5 h-3.5 text-brand" />
                 Project:
               </span>
-              <div className="relative inline-flex items-center">
+              <div className="relative inline-flex items-center flex-1 min-w-0 sm:flex-initial">
                 <select
                   value={selectedProject}
                   onChange={(e) => handleProjectChange(e.target.value)}
-                  className="appearance-none text-xs font-semibold bg-[#f3f5f8] border border-[#e8ecf2] text-[#0f1d33] rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:ring-1 focus:ring-[#0f1d33] cursor-pointer hover:bg-[#e8ecf2] transition-colors"
+                  className="appearance-none w-full min-w-0 sm:max-w-[280px] min-h-[44px] sm:min-h-0 text-ellipsis overflow-hidden whitespace-nowrap text-xs font-semibold bg-[#f3f5f8] border border-[#e8ecf2] text-[#0f1d33] rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:ring-1 focus:ring-[#0f1d33] cursor-pointer hover:bg-[#e8ecf2] transition-colors"
                 >
                   <option value="all">All Projects</option>
                   {projects.map((p) => (
@@ -1068,16 +1068,16 @@ export default function InboxDashboardClient({
             <div className="hidden sm:block w-px h-5 bg-[#e8ecf2]" />
 
             {/* Select Form Dropdown */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#5a6a82] shrink-0 whitespace-nowrap select-none flex items-center gap-1.5">
+            <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
+              <span className="text-xs font-bold uppercase tracking-wider text-[#5a6a82] w-[84px] sm:w-auto shrink-0 whitespace-nowrap select-none flex items-center gap-1.5">
                 <FileText className="w-3.5 h-3.5 text-[#1e3a5f]" />
                 Form:
               </span>
-              <div className="relative inline-flex items-center">
+              <div className="relative inline-flex items-center flex-1 min-w-0 sm:flex-initial">
                 <select
                   value={selectedForm}
                   onChange={(e) => handleFormChange(e.target.value)}
-                  className="appearance-none text-xs font-semibold bg-[#f3f5f8] border border-[#e8ecf2] text-[#0f1d33] rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:ring-1 focus:ring-[#0f1d33] cursor-pointer hover:bg-[#e8ecf2] transition-colors max-w-[240px] truncate"
+                  className="appearance-none w-full min-w-0 sm:max-w-[240px] min-h-[44px] sm:min-h-0 text-ellipsis overflow-hidden whitespace-nowrap text-xs font-semibold bg-[#f3f5f8] border border-[#e8ecf2] text-[#0f1d33] rounded-lg pl-3 pr-8 py-2 focus:outline-none focus:ring-1 focus:ring-[#0f1d33] cursor-pointer hover:bg-[#e8ecf2] transition-colors"
                 >
                   <option value="all">All Forms</option>
                   {filteredForms.map((f) => (
@@ -1094,7 +1094,7 @@ export default function InboxDashboardClient({
             {(selectedProject !== 'all' || selectedForm !== 'all' || selectedDateRange !== 'all') && (
               <button
                 onClick={handleClearFilters}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 transition-colors border border-red-200 cursor-pointer"
+                className="inline-flex min-h-[44px] sm:min-h-0 items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 transition-colors border border-red-200 cursor-pointer"
                 title="Reset date, project and form filters"
               >
                 <FilterX className="w-3.5 h-3.5" />

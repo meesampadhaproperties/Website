@@ -80,7 +80,8 @@ export async function getLeads(
   if (filters?.sources && filters.sources.length > 0) {
     // If 'meta' is selected, it should match meta, facebook, instagram
     let sourceFilters: string[] = [];
-    filters.sources.forEach(src => {
+    // Source keys are interpolated into a PostgREST filter string: keep plain identifiers only (no , ( ) . : % injection)
+    filters.sources.map(s => String(s).replace(/[^a-z0-9_ -]/gi, '').trim()).filter(Boolean).forEach(src => {
       if (src === 'meta') {
         sourceFilters.push('meta', 'facebook', 'instagram');
       } else {
@@ -88,8 +89,10 @@ export async function getLeads(
       }
     });
     // Build an OR condition for source_page using ilike
-    const sourceOrQuery = sourceFilters.map(src => `source_page.ilike.%${src}%`).join(',');
-    query = query.or(sourceOrQuery);
+    if (sourceFilters.length > 0) {
+      const sourceOrQuery = sourceFilters.map(src => `source_page.ilike.%${src}%`).join(',');
+      query = query.or(sourceOrQuery);
+    }
   }
 
   // Apply Dates (Anchored explicitly to Indian Standard Time Asia/Kolkata +05:30)

@@ -116,7 +116,7 @@ export default function ProjectDataClient({ project, items, loadError }: {
             className="w-full min-h-[44px] rounded-lg border border-[#e8ecf2] bg-[#f8fafc] pl-9 pr-3 text-sm text-[#0f1d33] focus:outline-none focus:ring-1 focus:ring-[#0f1d33]"
           />
         </div>
-        <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Filter by type">
+        <div className="flex flex-wrap gap-2 pb-1" role="tablist" aria-label="Filter by type">
           {FILTERS.map(f => {
             const active = filter === f.id
             const Icon = f.icon

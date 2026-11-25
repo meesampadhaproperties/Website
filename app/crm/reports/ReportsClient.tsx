@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useMemo, useState, useTransition } from 'react'
 import {
   ResponsiveContainer, AreaChart, Area, BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts'
@@ -98,13 +98,11 @@ function ChartCard({ title, subtitle, rows, children, className = '' }: {
   )
 }
 
-/** Trend chart: scrolls sideways when there are many days (opens at the latest day). */
-function ScrollableTrend({ points, children }: { points: number; children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => { if (ref.current) ref.current.scrollLeft = ref.current.scrollWidth }, [points])
+/** Trend chart: always fits the card width (no sideways scrolling on phones); the X axis skips labels via minTickGap. */
+function ScrollableTrend({ children }: { points: number; children: React.ReactNode }) {
   return (
-    <div ref={ref} className="w-full overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
-      <div className="h-[220px] sm:h-[280px]" style={{ minWidth: `max(100%, ${points * 34}px)` }}>{children}</div>
+    <div className="w-full pb-2">
+      <div className="h-[220px] sm:h-[280px] w-full">{children}</div>
     </div>
   )
 }
@@ -195,16 +193,16 @@ export default function ReportsClient({ initialReport, initialError }: { initial
         </button>
       </div>
 
-      {/* Range filter: one row, scrolls horizontally on small screens */}
-      <div className="-mx-1 overflow-x-auto px-1 pb-1">
-        <div className="inline-flex gap-1 rounded-lg border border-[#e8ecf2] bg-[#f3f5f8] p-1" role="group" aria-label="Date range">
+      {/* Range filter: wraps into a grid on phones (no sideways scrolling), one row from sm: up */}
+      <div className="pb-1">
+        <div className="grid grid-cols-3 sm:inline-flex w-full sm:w-auto gap-1 rounded-lg border border-[#e8ecf2] bg-[#f3f5f8] p-1" role="group" aria-label="Date range">
           {RANGES.map(r => (
             <button
               key={r.value}
               onClick={() => load(r.value)}
               disabled={isPending}
               aria-pressed={range === r.value}
-              className={`min-h-[36px] whitespace-nowrap rounded-md px-3 text-xs font-semibold transition-colors cursor-pointer disabled:cursor-wait ${range === r.value ? 'bg-[#0f1d33] text-white shadow-xs' : 'text-[#5a6a82] hover:bg-white hover:text-[#0f1d33]'}`}
+              className={`min-h-[40px] sm:min-h-[36px] whitespace-nowrap rounded-md px-2 sm:px-3 text-xs font-semibold transition-colors cursor-pointer disabled:cursor-wait ${range === r.value ? 'bg-[#0f1d33] text-white shadow-xs' : 'text-[#5a6a82] hover:bg-white hover:text-[#0f1d33]'}`}
             >
               {r.label}
             </button>
@@ -222,7 +220,7 @@ export default function ReportsClient({ initialReport, initialError }: { initial
         <div className={`space-y-5 md:space-y-6 transition-opacity ${isPending ? 'opacity-60' : ''}`} aria-busy={isPending}>
           {/* KPI cards: total + every lead status with its badge */}
           <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3 md:gap-4 xl:grid-cols-4">
-            <div className="min-w-0 rounded-xl border border-[#0f1d33] bg-[#0f1d33] p-3 sm:p-4 md:p-5 text-white">
+            <div className="col-span-2 md:col-span-1 min-w-0 rounded-xl border border-[#0f1d33] bg-[#0f1d33] p-3 sm:p-4 md:p-5 text-white">
               <div className="flex items-center justify-between gap-2">
                 <span className="truncate text-[11px] sm:text-xs font-semibold text-white/80">Total Leads</span>
                 <Database className="h-4 w-4 shrink-0 text-white/70" />

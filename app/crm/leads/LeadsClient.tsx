@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Plus, Edit2, Trash2, X, Search, Globe, FilterX, Download, Upload, MessageCircle, Megaphone, Settings, ArrowUp, ArrowDown, ArrowUpDown, Check, RefreshCw, AlertTriangle, Loader2, FolderKanban, FileCheck2, FileX2, ChevronDown, Phone, Calendar } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Search, Globe, FilterX, Download, Upload, MessageCircle, Megaphone, Settings, ArrowUp, ArrowDown, ArrowUpDown, Check, RefreshCw, AlertTriangle, Loader2, FolderKanban, FileCheck2, FileX2, ChevronDown, Phone, Calendar, SlidersHorizontal } from 'lucide-react'
 
 
 import { createClient } from '@/lib/supabase/client'
@@ -261,6 +261,8 @@ export default function LeadsClient({
   };
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
   const [selectedSources, setSelectedSources] = useState<string[]>([])
+  // Phones only: the four filter rows are collapsed behind one "Filters" button (always visible from sm: up)
+  const [showFilters, setShowFilters] = useState(false)
   const [dateFilterType, setDateFilterType] = useState<'single' | 'range'>('single')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
@@ -887,6 +889,9 @@ export default function LeadsClient({
   const filteredLeads = leads; // We now use the server-filtered leads directly
 
 
+  // Badge on the phone "Filters" button: how many filter groups are active (search excluded: it is always visible)
+  const activeFilterCount = (selectedProject !== 'all' ? 1 : 0) + (selectedStatus !== 'all' ? 1 : 0) + (selectedSources.length > 0 ? 1 : 0) + ((startDate || endDate) ? 1 : 0)
+
   return (
     <div className="space-y-6">
       {enquiryLead && (
@@ -933,17 +938,32 @@ export default function LeadsClient({
       <div className="flex flex-col gap-3.5 bg-white p-3.5 sm:p-4 rounded-xl border border-[#e8ecf2] shadow-sm">
         {/* Row 1: Search Bar & Actions */}
         <div className="flex flex-col md:flex-row items-center gap-3 w-full">
-          <div className="relative flex-1 w-full">
+          <div className="flex items-center gap-2 w-full md:flex-1">
+          <div className="relative flex-1 min-w-0">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none">
               <Search className="h-4 w-4 text-[#5a6a82]" />
             </div>
             <input
               type="text"
-              placeholder="Search leads by name, email, phone, or project..."
+              placeholder="Search leads…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full rounded-lg border border-[#e8ecf2] bg-[#f9fafb] py-2 pl-10 pr-4 text-sm text-[#0f1d33] placeholder-[#5a6a82] outline-none focus:border-[#1e3a5f] focus:ring-1 focus:ring-[#1e3a5f] transition-shadow"
+              className="block w-full min-h-[44px] sm:min-h-0 rounded-lg border border-[#e8ecf2] bg-[#f9fafb] py-2 pl-10 pr-4 text-sm text-[#0f1d33] placeholder-[#5a6a82] outline-none focus:border-[#1e3a5f] focus:ring-1 focus:ring-[#1e3a5f] transition-shadow"
             />
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowFilters(v => !v)}
+            aria-expanded={showFilters}
+            aria-controls="leads-filter-panel"
+            className="sm:hidden relative inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-lg border border-[#e8ecf2] bg-[#f3f5f8] px-3.5 text-xs font-semibold text-[#1e3a5f] active:bg-[#e8ecf2]"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#1e3a5f] px-1 text-[10px] font-bold text-white">{activeFilterCount}</span>
+            )}
+          </button>
           </div>
 
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 w-full md:w-auto md:justify-end">
@@ -957,7 +977,7 @@ export default function LeadsClient({
                   setEndDate('')
                   setSearchQuery('')
                 }}
-                className="col-span-2 sm:col-span-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 transition-colors border border-red-200"
+                className="col-span-2 sm:col-span-1 inline-flex min-h-[44px] sm:min-h-0 items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-lg text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 transition-colors border border-red-200"
                 title="Reset all active filters"
               >
                 <FilterX className="w-3.5 h-3.5" /> Clear All Filters
@@ -970,19 +990,19 @@ export default function LeadsClient({
                   type="button"
                   onClick={handleReconcileLeads}
                   disabled={isReconciling}
-                  className="inline-flex items-center gap-1.5 justify-center rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 sm:px-3.5 sm:py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer shrink-0"
+                  className="col-span-2 sm:col-span-1 inline-flex min-h-[44px] sm:min-h-0 items-center gap-1.5 justify-center rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-2 sm:px-3.5 sm:py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50 disabled:pointer-events-none transition-colors cursor-pointer shrink-0"
                   title="Scan Meta forms across all projects to verify and recover any dropped leads"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 text-emerald-700 ${isReconciling ? 'animate-spin' : ''}`} />
                   <span>{isReconciling ? 'Reconciling...' : 'Reconcile Leads'}</span>
-                  <span suppressHydrationWarning className="text-[10px] font-medium text-emerald-600/90 ml-1 pl-1.5 border-l border-emerald-300">
+                  <span suppressHydrationWarning className="text-[10px] font-medium text-emerald-600/90 ml-1 pl-1.5 border-l border-emerald-300 whitespace-nowrap">
                     Next Auto: {cronCountdown !== null ? formatCronCountdown(cronCountdown) : '24h'}
                   </span>
                 </button>
                 <button
                   type="button"
                   onClick={openMetaSettings}
-                  className="inline-flex items-center gap-1.5 justify-center rounded-lg bg-[#f3f5f8] border border-[#e8ecf2] px-3 py-2 sm:px-3.5 sm:py-1.5 text-xs font-semibold text-[#1e3a5f] hover:bg-[#e8ecf2] transition-colors cursor-pointer"
+                  className="inline-flex min-h-[44px] sm:min-h-0 items-center gap-1.5 justify-center rounded-lg bg-[#f3f5f8] border border-[#e8ecf2] px-3 py-2 sm:px-3.5 sm:py-1.5 text-xs font-semibold text-[#1e3a5f] hover:bg-[#e8ecf2] transition-colors cursor-pointer"
                 >
                   <Settings className="h-3.5 w-3.5" />
                   Meta Setup
@@ -994,7 +1014,7 @@ export default function LeadsClient({
               <button
                 type="button"
                 onClick={() => setIsImportModalOpen(true)}
-                className="inline-flex items-center gap-1.5 justify-center rounded-lg border border-[#002935] bg-white px-3.5 py-2 sm:py-1.5 text-xs font-semibold text-[#002935] shadow-xs hover:bg-[#f3f5f8] transition-all cursor-pointer"
+                className="inline-flex min-h-[44px] sm:min-h-0 items-center gap-1.5 justify-center rounded-lg border border-[#002935] bg-white px-3.5 py-2 sm:py-1.5 text-xs font-semibold text-[#002935] shadow-xs hover:bg-[#f3f5f8] transition-all cursor-pointer"
                 title="Import leads from an Excel file (.xlsx)"
               >
                 <Download className="h-3.5 w-3.5" />
@@ -1004,7 +1024,7 @@ export default function LeadsClient({
             <button
               type="button"
               onClick={() => setIsExportModalOpen(true)}
-              className={`${canEdit ? '' : 'col-span-2 sm:w-auto'} inline-flex items-center gap-1.5 justify-center rounded-lg bg-[#002935] px-3.5 py-2 sm:py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#003847] transition-all cursor-pointer`}
+              className={`${((userRole === 'Super Admin' ? 1 : 0) + (canEdit ? 1 : 0) + 1) % 2 === 1 ? 'col-span-2 sm:col-span-1' : ''} inline-flex min-h-[44px] sm:min-h-0 items-center gap-1.5 justify-center rounded-lg bg-[#002935] px-3.5 py-2 sm:py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-[#003847] transition-all cursor-pointer`}
               title="Export leads as PDF, Excel, or CSV with custom columns"
             >
               <Upload className="h-3.5 w-3.5 text-brand" />
@@ -1013,6 +1033,8 @@ export default function LeadsClient({
           </div>
         </div>
 
+        {/* Filter rows: collapsed behind the "Filters" button on phones, always shown from sm: up */}
+        <div id="leads-filter-panel" className={`${showFilters ? 'flex' : 'hidden'} sm:flex flex-col gap-3.5 min-w-0`}>
         {/* Row 2: Filter by Project (First Filter) */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-2.5 border-t border-[#f0f3f7] min-w-0">
           <span className="text-xs font-bold uppercase tracking-wider text-[#5a6a82] shrink-0 whitespace-nowrap select-none flex items-center gap-1.5">
@@ -1023,7 +1045,7 @@ export default function LeadsClient({
           <div className="flex items-center gap-2 min-w-0 w-full flex-1">
             <button
               onClick={() => setSelectedProject('all')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border shrink-0 select-none ${
+              className={`inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-full text-xs font-medium transition-all border shrink-0 select-none ${
                 selectedProject === 'all'
                   ? 'bg-[#0f1d33] text-white border-[#0f1d33] shadow-xs font-semibold'
                   : 'bg-[#f3f5f8] text-[#5a6a82] border-transparent hover:bg-[#e8ecf2] hover:text-[#0f1d33]'
@@ -1052,7 +1074,7 @@ export default function LeadsClient({
                       <button
                         key={p.id}
                         onClick={() => setSelectedProject(isSelected ? 'all' : p.name)}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border shrink-0 ${
+                        className={`inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-full text-xs font-medium transition-all border shrink-0 ${
                           isSelected
                             ? 'bg-amber-50 text-amber-900 border-amber-300 ring-2 ring-amber-300/30 font-semibold shadow-xs'
                             : 'bg-[#f3f5f8] text-[#5a6a82] border-transparent hover:bg-[#e8ecf2] hover:text-[#0f1d33]'
@@ -1091,7 +1113,7 @@ export default function LeadsClient({
                     key={src.id || src.key}
                     type="button"
                     onClick={() => toggleSourceFilter(sKey)}
-                    className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium transition-all border shrink-0 select-none ${
+                    className={`inline-flex items-center px-3 py-2 sm:py-1.5 rounded-full text-xs font-medium transition-all border shrink-0 select-none ${
                       isSelected
                         ? 'bg-[#1e3a5f] text-white border-[#1e3a5f] shadow-xs font-semibold'
                         : 'bg-[#f3f5f8] text-[#5a6a82] border-transparent hover:bg-[#e8ecf2] hover:text-[#0f1d33]'
@@ -1114,7 +1136,7 @@ export default function LeadsClient({
 
           <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
             {/* Quick Date Presets */}
-            <div className="flex items-center gap-1 bg-[#f3f5f8] rounded-lg p-0.5 border border-[#e8ecf2] shrink-0">
+            <div className="grid grid-cols-4 sm:flex items-center gap-1 bg-[#f3f5f8] rounded-lg p-0.5 border border-[#e8ecf2] w-full sm:w-auto shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -1122,7 +1144,7 @@ export default function LeadsClient({
                   setStartDate(getIstCurrentDateString());
                   setEndDate('');
                 }}
-                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
+                className={`min-h-[40px] sm:min-h-0 px-1 sm:px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
                   dateFilterType === 'single' && startDate === getIstCurrentDateString()
                     ? 'bg-[#1877f2] text-white shadow-xs'
                     : 'text-[#5a6a82] hover:text-[#0f1d33]'
@@ -1137,7 +1159,7 @@ export default function LeadsClient({
                   setStartDate(getIstYesterdayDateString());
                   setEndDate('');
                 }}
-                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
+                className={`min-h-[40px] sm:min-h-0 px-1 sm:px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
                   dateFilterType === 'single' && startDate === getIstYesterdayDateString()
                     ? 'bg-[#1877f2] text-white shadow-xs'
                     : 'text-[#5a6a82] hover:text-[#0f1d33]'
@@ -1152,7 +1174,7 @@ export default function LeadsClient({
                   setStartDate(getIstDaysAgoDateString(7));
                   setEndDate(getIstCurrentDateString());
                 }}
-                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
+                className={`min-h-[40px] sm:min-h-0 px-1 sm:px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
                   dateFilterType === 'range' && startDate === getIstDaysAgoDateString(7) && endDate === getIstCurrentDateString()
                     ? 'bg-[#1877f2] text-white shadow-xs'
                     : 'text-[#5a6a82] hover:text-[#0f1d33]'
@@ -1167,7 +1189,7 @@ export default function LeadsClient({
                   setStartDate(getIstDaysAgoDateString(30));
                   setEndDate(getIstCurrentDateString());
                 }}
-                className={`px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
+                className={`min-h-[40px] sm:min-h-0 px-1 sm:px-2.5 py-1 text-[11px] font-semibold rounded-md transition-colors ${
                   dateFilterType === 'range' && startDate === getIstDaysAgoDateString(30) && endDate === getIstCurrentDateString()
                     ? 'bg-[#1877f2] text-white shadow-xs'
                     : 'text-[#5a6a82] hover:text-[#0f1d33]'
@@ -1178,13 +1200,13 @@ export default function LeadsClient({
             </div>
 
             {/* Single / Range Mode Toggle */}
-            <div className="flex bg-[#f3f5f8] rounded-lg p-0.5 border border-[#e8ecf2] shrink-0">
+            <div className="grid grid-cols-2 sm:flex bg-[#f3f5f8] rounded-lg p-0.5 border border-[#e8ecf2] w-full sm:w-auto shrink-0">
               <button
                 onClick={() => {
                   setDateFilterType('single')
                   setEndDate('')
                 }}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                className={`min-h-[40px] sm:min-h-0 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
                   dateFilterType === 'single'
                     ? 'bg-[#0f1d33] text-white shadow-xs'
                     : 'text-[#5a6a82] hover:text-[#0f1d33]'
@@ -1194,7 +1216,7 @@ export default function LeadsClient({
               </button>
               <button
                 onClick={() => setDateFilterType('range')}
-                className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
+                className={`min-h-[40px] sm:min-h-0 px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
                   dateFilterType === 'range'
                     ? 'bg-[#0f1d33] text-white shadow-xs'
                     : 'text-[#5a6a82] hover:text-[#0f1d33]'
@@ -1208,17 +1230,17 @@ export default function LeadsClient({
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="rounded-lg border border-[#e8ecf2] bg-[#f3f5f8] px-2.5 py-1 text-xs text-[#0f1d33] outline-none focus:border-[#1e3a5f] shrink-0 flex-1 sm:flex-initial"
+              className="rounded-lg border border-[#e8ecf2] bg-[#f3f5f8] min-h-[44px] sm:min-h-0 px-2.5 py-1 text-xs text-[#0f1d33] outline-none focus:border-[#1e3a5f] min-w-0 w-full sm:w-auto flex-1 sm:flex-initial"
             />
 
             {dateFilterType === 'range' && (
               <>
-                <span className="text-[#5a6a82] text-xs shrink-0">to</span>
+                <span className="text-[#5a6a82] text-xs shrink-0 hidden sm:inline">to</span>
                 <input
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="rounded-lg border border-[#e8ecf2] bg-[#f3f5f8] px-2.5 py-1 text-xs text-[#0f1d33] outline-none focus:border-[#1e3a5f] shrink-0 flex-1 sm:flex-initial"
+                  className="rounded-lg border border-[#e8ecf2] bg-[#f3f5f8] min-h-[44px] sm:min-h-0 px-2.5 py-1 text-xs text-[#0f1d33] outline-none focus:border-[#1e3a5f] min-w-0 w-full sm:w-auto flex-1 sm:flex-initial"
                 />
               </>
             )}
@@ -1230,7 +1252,7 @@ export default function LeadsClient({
                   setStartDate('')
                   setEndDate('')
                 }}
-                className="px-2 py-1 text-[11px] font-medium text-[#dc2626] hover:bg-red-50 rounded-md border border-red-200 transition-colors shrink-0"
+                className="min-h-[40px] sm:min-h-0 px-3 sm:px-2 py-1 text-[11px] font-medium text-[#dc2626] hover:bg-red-50 rounded-md border border-red-200 transition-colors shrink-0"
               >
                 Clear Date
               </button>
@@ -1248,7 +1270,7 @@ export default function LeadsClient({
             {/* All Statuses Button - Fixed outside scroll so it never moves */}
             <button
               onClick={() => setSelectedStatus('all')}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border shrink-0 select-none ${
+              className={`inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-full text-xs font-medium transition-all border shrink-0 select-none ${
                 selectedStatus === 'all'
                   ? 'bg-[#1e3a5f] text-white border-[#1e3a5f] shadow-xs font-semibold'
                   : 'bg-[#f3f5f8] text-[#5a6a82] border-transparent hover:bg-[#e8ecf2] hover:text-[#0f1d33]'
@@ -1276,7 +1298,7 @@ export default function LeadsClient({
                     <button
                       key={st.id || sKey}
                       onClick={() => setSelectedStatus(isSelected ? 'all' : (st.key || sKey))}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border shrink-0 ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-full text-xs font-medium transition-all border shrink-0 ${
                         isSelected
                           ? `${st.color_bg || 'bg-blue-50'} ${st.color_text || 'text-blue-700'} ${st.color_border || 'border-blue-300'} ring-2 ring-current/25 font-semibold shadow-xs`
                           : 'bg-[#f3f5f8] text-[#5a6a82] border-transparent hover:bg-[#e8ecf2] hover:text-[#0f1d33]'
@@ -1290,6 +1312,7 @@ export default function LeadsClient({
               </div>
             </div>
           </div>
+        </div>
         </div>
       </div>
 

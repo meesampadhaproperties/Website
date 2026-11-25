@@ -370,7 +370,7 @@ export default function ModulesClient({ initialRecipients, initialWaRecipients, 
   }
 
   return (
-    <div className="p-1 md:p-2 h-full flex flex-col relative overflow-y-auto">
+    <div className="p-1 md:p-2 flex flex-col relative">
       {/* Header */}
       <div className="flex flex-col mb-6 shrink-0">
         <h1 className="text-2xl font-bold text-[#0f1d33] flex items-center gap-2">

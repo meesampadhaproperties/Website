@@ -311,11 +311,11 @@ export default function LeadStatusManager({ initialStatuses }: LeadStatusManager
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-[#f8fafc] border-b border-[#e8ecf2] text-[11px] font-semibold text-[#5a6a82] uppercase tracking-wider">
-              <th className="py-3 px-4">Order</th>
-              <th className="py-3 px-4">Status & Badge</th>
-              <th className="py-3 px-4">Active Leads</th>
-              <th className="py-3 px-4 text-right">Actions</th>
+            <tr className="bg-[#f8fafc] border-b border-[#e8ecf2] text-[11px] font-semibold text-[#5a6a82] uppercase tracking-normal sm:tracking-wider">
+              <th className="py-3 px-2 sm:px-4">#</th>
+              <th className="py-3 px-2 sm:px-4">Status</th>
+              <th className="py-3 px-2 sm:px-4">Leads</th>
+              <th className="py-3 px-2 sm:px-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#e8ecf2] text-sm">
@@ -328,11 +328,11 @@ export default function LeadStatusManager({ initialStatuses }: LeadStatusManager
             ) : (
               paginatedStatuses.map((st) => (
                 <tr key={st.id} className="hover:bg-[#f8fafc] transition-colors">
-                  <td className="py-3 px-4 text-xs font-mono text-[#5a6a82]">
+                  <td className="py-3 px-2 sm:px-4 text-xs font-mono text-[#5a6a82]">
                     #{st.sort_order}
                   </td>
-                  <td className="py-3 px-4">
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${st.color_bg} ${st.color_text} ${st.color_border || 'border-transparent'}`}>
+                  <td className="py-3 px-2 sm:px-4">
+                    <span className={`inline-flex max-w-full items-center gap-1.5 px-3 py-1 rounded-xl sm:rounded-full text-xs font-medium border break-words ${st.color_bg} ${st.color_text} ${st.color_border || 'border-transparent'}`}>
                       <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70"></span>
                       {st.name}
                       {st.is_system && (
@@ -342,19 +342,19 @@ export default function LeadStatusManager({ initialStatuses }: LeadStatusManager
                       )}
                     </span>
                   </td>
-                  <td className="py-3 px-4">
+                  <td className="py-3 px-2 sm:px-4">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium ${
                       (st.leads_count || 0) > 0 ? 'bg-[#f3f5f8] text-[#0f1d33]' : 'text-[#5a6a82]'
                     }`}>
                       <Users className="w-3.5 h-3.5 text-[#5a6a82]" />
-                      {st.leads_count || 0} leads
+                      {st.leads_count || 0}<span className="hidden sm:inline"> leads</span>
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1">
+                  <td className="py-3 px-2 sm:px-4 text-right">
+                    <div className="flex items-center justify-end gap-0.5 sm:gap-1">
                       <button
                         onClick={() => openEditModal(st)}
-                        className="p-1.5 rounded-md transition-colors text-[#5a6a82] hover:text-[#1e3a5f] hover:bg-[#f3f5f8]"
+                        className="p-2.5 sm:p-1.5 rounded-md transition-colors text-[#5a6a82] hover:text-[#1e3a5f] hover:bg-[#f3f5f8]"
                         title="Edit Status"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -367,7 +367,7 @@ export default function LeadStatusManager({ initialStatuses }: LeadStatusManager
                               description: 'The "New" status is the intake default for incoming inquiries and cannot be deleted.'
                             })
                           }}
-                          className="p-1.5 text-gray-300 cursor-not-allowed rounded-md"
+                          className="p-2.5 sm:p-1.5 text-gray-300 cursor-not-allowed rounded-md"
                           title="System status cannot be deleted"
                         >
                           <Lock className="w-4 h-4" />
@@ -375,7 +375,7 @@ export default function LeadStatusManager({ initialStatuses }: LeadStatusManager
                       ) : (
                         <button
                           onClick={() => initiateDelete(st)}
-                          className="p-1.5 text-[#5a6a82] hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          className="p-2.5 sm:p-1.5 text-[#5a6a82] hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
                           title="Delete Status"
                         >
                           <Trash2 className="w-4 h-4" />

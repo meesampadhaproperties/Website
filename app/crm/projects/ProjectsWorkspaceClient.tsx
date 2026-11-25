@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import Link from 'next/link'
 import { StorageIndicator } from '@/components/StorageIndicator'
 import { createClient } from '@/lib/supabase/client'
+import { DOCUMENT_NAME_MAX_CHARS } from '@/lib/project-documents'
 import {
   createArea, renameArea, deleteArea, createWorkspaceProject, updateWorkspaceProject, deleteWorkspaceProject,
   setProjectArea, createLinkDocument, createDocumentUpload, finalizeDocumentUpload, getDocumentOpenUrl,
@@ -41,6 +42,21 @@ function DocIcon({ doc }: { doc: ProjectDocument }) {
   if (m.startsWith('audio/')) return <Music className={`${cls} text-pink-600`} />
   if (m.includes('zip')) return <FileArchive className={`${cls} text-amber-600`} />
   return <FileText className={`${cls} text-[#1e3a5f]`} />
+}
+
+/** Document name input with a live "characters left" countdown (names are website download labels). */
+function DocNameInput({ value, onChange, placeholder, autoFocus }: { value: string; onChange: (v: string) => void; placeholder?: string; autoFocus?: boolean }) {
+  const left = DOCUMENT_NAME_MAX_CHARS - value.length
+  const tone = left <= 0 ? 'text-red-600' : left <= 5 ? 'text-amber-600' : 'text-[#8a99ad]'
+  return (
+    <label className="text-xs font-semibold text-[#5a6a82]">
+      <span className="flex items-center justify-between gap-2">
+        Document name
+        <span aria-live="polite" className={`tabular-nums ${tone}`}>{left} characters left</span>
+      </span>
+      <input autoFocus={autoFocus} required maxLength={DOCUMENT_NAME_MAX_CHARS} value={value} onChange={(e) => onChange(e.target.value.slice(0, DOCUMENT_NAME_MAX_CHARS))} placeholder={placeholder} className={`${inputCls} mt-1`} />
+    </label>
+  )
 }
 
 /** Mobile bottom-sheet / desktop centered modal with backdrop scroll-lock and Esc to close */
@@ -460,9 +476,7 @@ export default function ProjectsWorkspaceClient({
       {modal?.type === 'editDocument' && (
         <Modal title="Rename Document" onClose={closeModal}>
           <form onSubmit={submitEditDocument} className="flex flex-col gap-3">
-            <label className="text-xs font-semibold text-[#5a6a82]">Document name
-              <input autoFocus required maxLength={200} value={docName} onChange={(e) => setDocName(e.target.value)} className={`${inputCls} mt-1`} />
-            </label>
+            <DocNameInput autoFocus value={docName} onChange={setDocName} />
             <button type="submit" disabled={busy} className={primaryBtn}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} Save</button>
           </form>
         </Modal>
@@ -491,9 +505,7 @@ export default function ProjectsWorkspaceClient({
       {modal?.type === 'document' && (
         <Modal title={`Create Document · ${modal.project.name}`} onClose={closeModal}>
           <form onSubmit={submitDocument} className="flex flex-col gap-3">
-            <label className="text-xs font-semibold text-[#5a6a82]">Document name
-              <input autoFocus required maxLength={200} value={docName} onChange={(e) => setDocName(e.target.value)} placeholder="e.g. Brochure, Layout plan, Site video" className={`${inputCls} mt-1`} />
-            </label>
+            <DocNameInput autoFocus value={docName} onChange={setDocName} placeholder="e.g. Brochure, Layout plan, Site video" />
 
             <div className="grid grid-cols-2 gap-1 rounded-lg bg-[#f3f5f8] p-1" role="tablist">
               {(['file', 'link'] as const).map(m => (
@@ -515,7 +527,7 @@ export default function ProjectsWorkspaceClient({
                 <input type="file" accept={FILE_ACCEPT} className="sr-only" onChange={(e) => {
                   const f = e.target.files?.[0] || null
                   setDocFile(f)
-                  if (f && !docName.trim()) setDocName(f.name.replace(/\.[^.]+$/, ''))
+                  if (f && !docName.trim()) setDocName(f.name.replace(/\.[^.]+$/, '').slice(0, DOCUMENT_NAME_MAX_CHARS))
                 }} />
               </label>
             ) : (

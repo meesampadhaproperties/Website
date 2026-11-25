@@ -146,7 +146,7 @@ export default function DashboardClient({ canEditFollowUps = false }: { canEditF
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 sm:space-y-8">
       {followUpLead && (
         <FollowUpDialog
           lead={followUpLead}
@@ -179,7 +179,8 @@ export default function DashboardClient({ canEditFollowUps = false }: { canEditF
       </div>
 
       {/* Dynamic KPI Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3 md:gap-4">
+      {/* 2-column phones/tablets: a leftover last card spans both columns instead of leaving an empty gap */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3 md:gap-4 [&>*:last-child:nth-child(odd)]:col-span-2 md:[&>*:last-child:nth-child(odd)]:col-span-1">
         {/* Follow Ups: pending follow ups on any status (always first, selected by default) */}
         <DashboardCard
           title="Follow Ups"

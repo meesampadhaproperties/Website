@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { checkActionAccess } from '@/lib/auth/permissions'
 import { getStorageLimitBytes } from '@/lib/site-config'
-import { removeProjectDocumentFiles, documentCategory, type DocumentCategory } from '@/lib/project-documents'
+import { removeProjectDocumentFiles, documentCategory, DOCUMENT_NAME_MAX_CHARS, type DocumentCategory } from '@/lib/project-documents'
 
 /**
  * Projects workspace: Areas → Projects → Documents (uploaded files or http links).
@@ -63,6 +63,9 @@ async function isWorkspaceProject(db: any, id: string): Promise<boolean> {
 
 function revalidate() {
   revalidatePath('/crm/projects')
+  // Website Projects use these documents as downloads (REQ-109)
+  revalidatePath('/crm/website-projects')
+  revalidatePath('/projects')
 }
 
 export async function getProjectsWorkspace(): Promise<{ areas: ProjectArea[]; projects: WorkspaceProject[]; error: string | null }> {
@@ -215,8 +218,9 @@ export async function createLinkDocument(input: { projectId: string; name: strin
   const auth = await checkActionAccess('projects', 'edit')
   if (!auth.authorized) return { success: false, error: auth.error }
 
-  const name = cleanName(input.name, 200)
+  const name = cleanName(input.name, 1000)
   if (!name) return { success: false, error: 'Document name is required.' }
+  if (name.length > DOCUMENT_NAME_MAX_CHARS) return { success: false, error: `Document name can be up to ${DOCUMENT_NAME_MAX_CHARS} characters.` }
   if (!UUID_RE.test(input.projectId)) return { success: false, error: 'Invalid project.' }
   if (!(await isWorkspaceProject(createServiceClient(), input.projectId))) return { success: false, error: 'Project not found.' }
 
@@ -274,8 +278,9 @@ export async function finalizeDocumentUpload(input: { projectId: string; name: s
   const auth = await checkActionAccess('projects', 'edit')
   if (!auth.authorized) return { success: false, error: auth.error }
 
-  const name = cleanName(input.name, 200)
+  const name = cleanName(input.name, 1000)
   if (!name) return { success: false, error: 'Document name is required.' }
+  if (name.length > DOCUMENT_NAME_MAX_CHARS) return { success: false, error: `Document name can be up to ${DOCUMENT_NAME_MAX_CHARS} characters.` }
   if (!UUID_RE.test(input.projectId) || !String(input.path).startsWith(`${input.projectId}/`) || input.path.includes('..')) {
     return { success: false, error: 'Invalid upload path.' }
   }
@@ -285,14 +290,25 @@ export async function finalizeDocumentUpload(input: { projectId: string; name: s
   const folder = input.projectId
   const fileKey = input.path.slice(folder.length + 1)
   const { data: found, error: listErr } = await db.storage.from(BUCKET).list(folder, { search: fileKey, limit: 1 })
-  if (listErr || !found?.some(o => o.name === fileKey)) return { success: false, error: 'Upload was not found. Please try again.' }
+  const stored = found?.find(o => o.name === fileKey)
+  if (listErr || !stored) return { success: false, error: 'Upload was not found. Please try again.' }
+
+  // Trust what storage actually holds, not what the browser claimed when the upload was requested
+  const realSize = Number((stored.metadata as any)?.size ?? 0)
+  const realMime = String((stored.metadata as any)?.mimetype || '').toLowerCase().split(';')[0].trim()
+  const usedBytes = await currentStorageBytes() // already includes this object
+  if (!(realSize > 0) || realSize > MAX_FILE_BYTES || !isAllowedMime(realMime)
+    || (usedBytes !== null && usedBytes > getStorageLimitBytes())) {
+    await db.storage.from(BUCKET).remove([input.path])
+    return { success: false, error: 'This file was rejected: unsupported type, too large, or storage is full.' }
+  }
 
   const { data, error } = await db
     .from('project_documents')
     .insert({
       project_id: input.projectId, name, doc_type: 'file', storage_path: input.path,
-      mime_type: String(input.mimeType || '').toLowerCase() || null,
-      size_bytes: Number(input.sizeBytes) || null, created_by: auth.user.id,
+      mime_type: realMime || null,
+      size_bytes: realSize || null, created_by: auth.user.id,
     })
     .select('id, project_id, name, doc_type, url, mime_type, size_bytes, created_at')
     .single()
@@ -325,8 +341,9 @@ export async function renameDocument(id: string, name: string): Promise<Result> 
   if (!auth.authorized) return { success: false, error: auth.error }
   if (!UUID_RE.test(id)) return { success: false, error: 'Invalid document.' }
 
-  const clean = cleanName(name, 200)
+  const clean = cleanName(name, 1000)
   if (!clean) return { success: false, error: 'Document name is required.' }
+  if (clean.length > DOCUMENT_NAME_MAX_CHARS) return { success: false, error: `Document name can be up to ${DOCUMENT_NAME_MAX_CHARS} characters.` }
 
   const { error } = await createServiceClient().from('project_documents').update({ name: clean }).eq('id', id)
   if (error) return { success: false, error: error.message }

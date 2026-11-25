@@ -353,9 +353,9 @@ export default function AccessControl({ roles: propRoles, users: propUsers }: { 
             <thead className="bg-[#f8fafc] border-b border-[#e8ecf2]">
               <tr>
                 <th className="w-[37%] px-3 sm:px-5 py-3 sm:py-3.5 font-semibold text-[#0f1d33] truncate">Module / Page</th>
-                <th className="w-[21%] px-1 sm:px-3 py-3 sm:py-3.5 font-semibold text-center text-red-600 truncate">No Access</th>
-                <th className="w-[21%] px-1 sm:px-3 py-3 sm:py-3.5 font-semibold text-center text-amber-600 truncate">View Only</th>
-                <th className="w-[21%] px-1 sm:px-3 py-3 sm:py-3.5 font-semibold text-center text-emerald-600 truncate">Edit Access</th>
+                <th className="w-[21%] px-1 sm:px-3 py-3 sm:py-3.5 font-semibold text-center text-red-600 ">No<span className="hidden sm:inline"> Access</span></th>
+                <th className="w-[21%] px-1 sm:px-3 py-3 sm:py-3.5 font-semibold text-center text-amber-600 ">View<span className="hidden sm:inline"> Only</span></th>
+                <th className="w-[21%] px-1 sm:px-3 py-3 sm:py-3.5 font-semibold text-center text-emerald-600 ">Edit<span className="hidden sm:inline"> Access</span></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#e8ecf2]">
