@@ -12,13 +12,15 @@ export const metadata = {
 export default async function WebsiteProjectsPage() {
   // Same permission as the Projects page: the downloads come from its documents
   const { accessLevel } = await requireAccess('projects')
-  const { categories, projects, crmProjects, error } = await getWebsiteProjectsWorkspace()
+  const { categories, projects, crmProjects, reviews, testimonials, error } = await getWebsiteProjectsWorkspace()
 
   return (
     <WebsiteProjectsClient
       initialCategories={categories}
       initialProjects={projects}
       crmProjects={crmProjects}
+      initialReviews={reviews}
+      initialTestimonials={testimonials}
       loadError={error}
       canEdit={accessLevel === 'edit'}
     />

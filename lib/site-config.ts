@@ -65,18 +65,18 @@ export const SITE_CONTACT = {
   name: 'Mee Sampadha',
   tagline: 'The Future of Real Estate',
   address: {
-    lines: ['1st Floor, H. No 12-6-2/269/3,', 'Near by PAI International,', 'Opp. BJP Office, Vivek Nagar,', 'Kukatpally, Hyderabad,', 'Telangana 500072'],
-    street: '1st Floor, H. No 12-6-2/269/3, near PAI International, opp. BJP Office, Vivek Nagar, Kukatpally',
+    lines: ['Flat 401, 4th Floor, Siddarth Enclave,', 'Mettakani Gudem, Vokshit Enclave,', 'Gajularamaram, Hyderabad,', 'Telangana, India 500055'],
+    street: 'Flat 401, 4th Floor, Siddarth Enclave, Mettakani Gudem, Vokshit Enclave, Gajularamaram',
     locality: 'Hyderabad',
     region: 'Telangana',
-    postalCode: '500072',
+    postalCode: '500055',
     country: 'IN',
   },
   phone: '+91 8977036622',
   phoneHref: 'tel:+918977036622',
   // TODO: replace with the WhatsApp CHATBOT number (digits only, with country code). Placeholder = office phone.
   whatsappNumber: '918977036622',
-  emails: ['info@meesampadha.com', 'meesampadha@gmail.com'],
+  emails: ['info@meesampadha.com', 'meesampadha.properties@gmail.com'],
 } as const
 
 /** Social profiles. Leave a value empty and its icon is hidden. Fill in the real URLs. */
@@ -90,4 +90,4 @@ export const SOCIAL_LINKS = {
 export const whatsappLink = (message: string) => `https://wa.me/${SITE_CONTACT.whatsappNumber}?text=${encodeURIComponent(message)}`
 
 /** Google Maps search link for the office address. */
-export const MAPS_LINK = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('Mee Sampadha, Vivek Nagar, Kukatpally, Hyderabad 500072')
+export const MAPS_LINK = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent('Flat 401, Siddarth Enclave, Mettakani Gudem, Vokshit Enclave, Gajularamaram, Hyderabad, Telangana 500055')

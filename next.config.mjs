@@ -22,13 +22,17 @@ const nextConfig = {
   images: {
     // Previously hostname '**' (open image proxy). Only the project's Supabase storage is allowed.
     remotePatterns: supabaseHost ? [{ protocol: 'https', hostname: supabaseHost }] : [],
+    // Realistic sizes only: the defaults list widths up to 3840px, which bloats every <img srcset> and lets anyone make the
+    // server generate huge copies. Our images are logos and small pictures, so nothing above 1920px is needed.
+    deviceSizes: [360, 640, 828, 1080, 1280, 1920],
+    imageSizes: [64, 128, 256, 384],
+    // The brand images never change under the same URL: keep the optimised copies for a year instead of re-making them.
+    minimumCacheTTL: 31536000,
   },
   // Typing /crm at the end of any website URL (e.g. /services/crm) opens the CRM.
   async redirects() {
     return [
       { source: '/:path+/crm', destination: '/crm', permanent: false },
-      // The Gallery page was replaced by Projects.
-      { source: '/gallery', destination: '/projects', permanent: true },
       { source: '/services', destination: '/projects', permanent: true },
     ];
   },
@@ -40,6 +44,8 @@ const nextConfig = {
       { source: '/crm/:path*', headers: noIndex },
       { source: '/crm', headers: noIndex },
       { source: '/connect/:path*', headers: noIndex },
+      // Brand images (logo, social preview): cached by browsers and the CDN for a day, refreshed in the background for a week
+      { source: '/brand/:path*', headers: [{ key: 'Cache-Control', value: 'public, max-age=86400, stale-while-revalidate=604800' }] },
       { source: '/api/:path*', headers: noIndex },
     ];
   },

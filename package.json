@@ -12,6 +12,8 @@
   "dependencies": {
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.49.1",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.1.1",
     "clsx": "^2.1.1",
     "exceljs": "^4.4.0",
     "jspdf": "^4.2.1",

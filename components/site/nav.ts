@@ -3,6 +3,8 @@ export const SITE_NAV = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
   { href: '/projects', label: 'Projects' },
+  { href: '/gallery', label: 'Gallery' },
+  { href: '/reviews', label: 'Reviews' },
 ]
 
 // Footer-only legal links. /data-deletion is NOT linked (owner's choice) but stays live:

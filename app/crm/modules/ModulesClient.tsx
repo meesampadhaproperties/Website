@@ -28,6 +28,8 @@ import AccessControl from './components/AccessControl'
 import LeadStatusManager from './components/LeadStatusManager'
 import LeadSourceManager from './components/LeadSourceManager'
 import SmsTemplatesManager from './components/SmsTemplatesManager'
+import SmsTemplatesDisabled from './components/SmsTemplatesDisabled'
+import { SMS_ENABLED } from '@/lib/sms'
 import EnquiryTypeManager from './components/EnquiryTypeManager'
 
 interface ModulesClientProps {
@@ -399,7 +401,7 @@ export default function ModulesClient({ initialRecipients, initialWaRecipients, 
 
       {/* SMS Templates (MSG91) Module */}
       <div className="mb-6">
-        <SmsTemplatesManager />
+        {SMS_ENABLED ? <SmsTemplatesManager /> : <SmsTemplatesDisabled />}
       </div>
 
       {/* Modules Grid */}

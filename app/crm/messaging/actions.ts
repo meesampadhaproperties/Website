@@ -5,7 +5,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { checkActionAccess } from '@/lib/auth/permissions'
 import { emailConfigured, sendEmails } from '@/lib/email'
 import { OUTREACH_MAX_LEADS, isValidEmail, personalize, textToEmailHtml } from '@/lib/outreach'
-import { SMS_VALUE_MAX, fillTemplate, msg91Mobile, sendMsg91Sms, templateVariables } from '@/lib/sms'
+import { SMS_ENABLED, SMS_DISABLED_MESSAGE, SMS_VALUE_MAX, fillTemplate, msg91Mobile, sendMsg91Sms, templateVariables } from '@/lib/sms'
 
 /**
  * Messaging leads (REQ-103), used by the Bulk Sender page and the Inbox.
@@ -92,6 +92,7 @@ export async function sendEmailToLeads(leadIds: string[], subject: string, body:
 export async function sendSmsToLeads(leadIds: string[], templateId: string, values: Record<string, string>): Promise<SendSummary | { error: string }> {
   const auth = await messagingAccess('edit')
   if (!auth.authorized) return { error: auth.error }
+  if (!SMS_ENABLED) return { error: SMS_DISABLED_MESSAGE }
   const ids = cleanIds(leadIds)
   if (!ids) return { error: `Choose between 1 and ${OUTREACH_MAX_LEADS} leads.` }
   if (!UUID_RE.test(String(templateId || ''))) return { error: 'Choose an SMS template.' }
