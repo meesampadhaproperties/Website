@@ -9,6 +9,13 @@ import { phoneMatchKey } from './lead-phone'
 
 const VAR_RE = /##([A-Za-z0-9_]+)##/g
 
+/**
+ * SMS master switch. While false, every SMS option in the CRM (Bulk Sender, Inbox composer, wallet card)
+ * shows "disabled" and the server refuses to send. Turn it back on when DLT registration is done.
+ */
+export const SMS_ENABLED = false
+export const SMS_DISABLED_MESSAGE = 'SMS is disabled for now.'
+
 /** DLT allows up to 30 characters per blank. */
 export const SMS_VALUE_MAX = 30
 

@@ -5,6 +5,8 @@ import { ChevronLeft, ChevronRight, ChevronDown, Loader2, Mail, Phone, Search, S
 import { toast } from 'sonner'
 import MessageComposer, { type MessageChannel } from '@/components/MessageComposer'
 import { SmsWalletCard } from '@/components/SmsWalletCard'
+import { SmsWalletDisabled } from '@/components/SmsWalletDisabled'
+import { SMS_ENABLED, SMS_DISABLED_MESSAGE } from '@/lib/sms'
 import { isAutoCapturedLead, sourceLabel } from '@/lib/lead-source'
 import { isValidEmail } from '@/lib/outreach'
 import { phoneMatchKey } from '@/lib/lead-phone'
@@ -89,15 +91,20 @@ export default function BulkSenderClient({
   }
 
   const selectedList = [...selected.values()]
-  const open = (list: BulkLead[], channel: MessageChannel) => setComposer({ leads: list, channel })
+  const open = (list: BulkLead[], channel: MessageChannel) => {
+    if (channel === 'sms' && !SMS_ENABLED) return void toast.info(SMS_DISABLED_MESSAGE)
+    setComposer({ leads: list, channel })
+  }
   const sendBtn = 'inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
   const iconBtn = 'inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed'
   const select = 'min-h-[44px] w-full appearance-none rounded-lg border border-[#e8ecf2] bg-white pl-3 pr-9 text-sm text-[#0f1d33] outline-none focus:border-[#1e3a5f] cursor-pointer'
 
   const rowActions = (l: BulkLead, labelled = false) => (
     <>
-      <button type="button" onClick={() => open([l], 'sms')} disabled={!phoneMatchKey(l.phone)} title="Send SMS" aria-label="Send SMS"
-        className={labelled ? `${sendBtn} border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100` : `${iconBtn} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-600 hover:text-white`}>
+      <button type="button" onClick={() => open([l], 'sms')} disabled={SMS_ENABLED && !phoneMatchKey(l.phone)} title={SMS_ENABLED ? 'Send SMS' : SMS_DISABLED_MESSAGE} aria-label={SMS_ENABLED ? 'Send SMS' : 'SMS is disabled'} aria-disabled={!SMS_ENABLED || undefined}
+        className={SMS_ENABLED
+          ? (labelled ? `${sendBtn} border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100` : `${iconBtn} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-600 hover:text-white`)
+          : (labelled ? `${sendBtn} border border-[#e8ecf2] bg-[#f3f5f8] text-[#8a99ad]` : `${iconBtn} border-[#e8ecf2] bg-[#f3f5f8] text-[#8a99ad]`)}>
         <Smartphone className="h-4 w-4" />{labelled && 'SMS'}
       </button>
       <button type="button" onClick={() => open([l], 'whatsapp')} disabled={!phoneMatchKey(l.phone)} title="Send WhatsApp" aria-label="Send WhatsApp"
@@ -129,7 +136,7 @@ export default function BulkSenderClient({
           <h1 className="flex items-center gap-2 text-xl sm:text-2xl font-bold text-[#0f1d33]"><Send className="h-6 w-6 text-[#1e3a5f]" /> Bulk Sender</h1>
           <p className="mt-1 text-sm text-[#5a6a82]">Select one lead, a few, or all of them, and send an email, SMS or WhatsApp message.</p>
         </div>
-        <SmsWalletCard refreshKey={walletKey} />
+        {SMS_ENABLED ? <SmsWalletCard refreshKey={walletKey} /> : <SmsWalletDisabled />}
       </div>
 
       {/* Filters */}
@@ -170,7 +177,7 @@ export default function BulkSenderClient({
           </div>
           <div className="grid grid-cols-3 gap-2 sm:flex">
             <button type="button" disabled={!selected.size} onClick={() => open(selectedList, 'email')} className={`${sendBtn} justify-center bg-indigo-600 text-white hover:bg-indigo-700`}><Mail className="h-4 w-4" /> Email</button>
-            <button type="button" disabled={!selected.size} onClick={() => open(selectedList, 'sms')} className={`${sendBtn} justify-center bg-sky-600 text-white hover:bg-sky-700`}><Smartphone className="h-4 w-4" /> SMS</button>
+            <button type="button" disabled={SMS_ENABLED && !selected.size} onClick={() => open(selectedList, 'sms')} title={SMS_ENABLED ? undefined : SMS_DISABLED_MESSAGE} aria-disabled={!SMS_ENABLED || undefined} className={`${sendBtn} justify-center ${SMS_ENABLED ? 'bg-sky-600 text-white hover:bg-sky-700' : 'border border-[#e8ecf2] bg-[#f3f5f8] text-[#8a99ad]'}`}><Smartphone className="h-4 w-4" /> SMS</button>
             <button type="button" disabled={!selected.size} onClick={() => open(selectedList, 'whatsapp')} className={`${sendBtn} justify-center bg-[#1ea952] text-white hover:bg-[#178a43]`}><WhatsAppGlyph className="h-4 w-4" /> WhatsApp</button>
           </div>
         </div>

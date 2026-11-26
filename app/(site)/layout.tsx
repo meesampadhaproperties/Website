@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from 'next'
+import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { Bricolage_Grotesque, Figtree } from 'next/font/google'
 import { SITE_BRAND, SITE_CONTACT, SOCIAL_LINKS, getConfiguredSiteUrl } from '@/lib/site-config'
 import { SiteHeader } from '@/components/site/SiteHeader'
@@ -55,6 +57,9 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
       <SiteFooter brand={SITE_BRAND} />
       <WhatsAppFab />
       <LazyEnquiryPopup />
+      {/* Visitor stats + real-user speed. Public website only: CRM pages (private lead/project addresses) are never sent. */}
+      <Analytics />
+      <SpeedInsights />
     </div>
   )
 }

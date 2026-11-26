@@ -5,7 +5,7 @@ import { CheckCircle2, ExternalLink, Loader2, Mail, Send, Smartphone, X } from '
 import { toast } from 'sonner'
 import { phoneMatchKey } from '@/lib/lead-phone'
 import { PERSONALIZE_HINT, isValidEmail, personalize, smsAppUrl, whatsappChatUrl, type OutreachLead } from '@/lib/outreach'
-import { SMS_VALUE_MAX, fillTemplate, templateVariables } from '@/lib/sms'
+import { SMS_ENABLED, SMS_DISABLED_MESSAGE, SMS_VALUE_MAX, fillTemplate, templateVariables } from '@/lib/sms'
 import { getMessagingSetup, logOutreach, sendEmailToLeads, sendSmsToLeads, type SendSummary } from '@/app/crm/messaging/actions'
 
 export type MessageChannel = 'email' | 'sms' | 'whatsapp'
@@ -111,8 +111,9 @@ export default function MessageComposer({
   const input = 'w-full min-h-[44px] rounded-lg border border-[#e8ecf2] bg-[#f8fafc] px-3 text-sm text-[#0f1d33] focus:outline-none focus:ring-1 focus:ring-[#0f1d33]'
   const tab = (c: MessageChannel, label: string, Icon: React.ElementType, count: number) => (
     <button key={c} type="button" role="tab" aria-selected={channel === c} onClick={() => switchTo(c)}
-      className={`flex min-h-[44px] flex-1 items-center justify-center gap-1.5 border-b-2 text-sm font-semibold cursor-pointer ${channel === c ? 'border-[#0f1d33] text-[#0f1d33]' : 'border-transparent text-[#5a6a82] hover:text-[#0f1d33]'}`}>
-      <Icon className="h-4 w-4" /> {label}{leads.length > 1 && <span className="text-[11px] font-medium text-[#8a99ad]">({count})</span>}
+      className={`flex min-h-[44px] flex-1 items-center justify-center gap-1.5 border-b-2 text-sm font-semibold cursor-pointer ${channel === c ? 'border-[#0f1d33] text-[#0f1d33]' : 'border-transparent text-[#5a6a82] hover:text-[#0f1d33]'} ${c === 'sms' && !SMS_ENABLED ? 'opacity-60' : ''}`}>
+      <Icon className="h-4 w-4" /> {label}
+      {c === 'sms' && !SMS_ENABLED ? <span className="rounded bg-[#f3f5f8] px-1.5 text-[10px] font-semibold text-[#8a99ad]">Disabled</span> : leads.length > 1 && <span className="text-[11px] font-medium text-[#8a99ad]">({count})</span>}
     </button>
   )
 
@@ -148,6 +149,12 @@ export default function MessageComposer({
               {summary.errors.length > 0 && <ul className="list-disc space-y-1 pl-5 text-xs text-red-700">{summary.errors.map((e) => <li key={e}>{e}</li>)}</ul>}
               <p className="text-xs text-[#8a99ad]">Each message is saved in the lead&apos;s history.</p>
               <button type="button" onClick={onClose} className="inline-flex min-h-[44px] items-center rounded-lg bg-[#0f1d33] px-4 text-sm font-semibold text-white hover:bg-[#1e3a5f] cursor-pointer">Done</button>
+            </div>
+          ) : channel === 'sms' && !SMS_ENABLED ? (
+            <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-[#d0d7e2] bg-[#f8fafc] px-4 py-8 text-center" role="status">
+              <Smartphone className="h-7 w-7 text-[#8a99ad]" />
+              <p className="text-sm font-semibold text-[#0f1d33]">{SMS_DISABLED_MESSAGE}</p>
+              <p className="text-xs text-[#5a6a82]">Use Email or WhatsApp for now.</p>
             </div>
           ) : channel === 'email' ? (
             <>

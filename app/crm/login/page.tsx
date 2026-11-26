@@ -166,7 +166,7 @@ export default function LoginPage() {
                       setErrorMessage('');
                       setForgotSuccess(false);
                     }}
-                    className="text-xs font-semibold text-[#5a6a82] hover:text-[#0f1d33] transition-colors cursor-pointer"
+                    className="-my-2 min-h-10 py-2 text-xs font-semibold text-[#5a6a82] hover:text-[#0f1d33] transition-colors cursor-pointer"
                   >
                     Forgot password?
                   </button>

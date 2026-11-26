@@ -11,6 +11,9 @@ import Link from 'next/link'
 import { JsonLd } from '@/components/site/JsonLd'
 import { getConfiguredSiteUrl } from '@/lib/site-config'
 import { EnquirySection } from '@/components/site/EnquirySection'
+import { TestimonialsSection } from '@/components/site/TestimonialsSection'
+import { AutoRefresh } from '@/components/site/AutoRefresh'
+import { getPublishedTestimonials } from '@/lib/website-projects'
 
 export const metadata: Metadata = {
   title: 'Mee Sampadha | Apartments, Villas & Plots in Hyderabad',
@@ -66,9 +69,14 @@ const wrap = 'mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8'
 const btn = 'inline-flex min-h-12 items-center justify-center gap-2 rounded-full px-6 text-base font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-site-gold'
 const h2 = 'font-display text-3xl font-semibold tracking-tight sm:text-4xl'
 
-export default function HomePage() {
+// Rebuilt at most every 5 minutes; saving a testimonial in CRM → Website Projects refreshes it right away (revalidatePath).
+export const revalidate = 300
+
+export default async function HomePage() {
+  const testimonials = await getPublishedTestimonials()
   return (
     <>
+      <AutoRefresh />
       <JsonLd data={faqSchema} />
       {getConfiguredSiteUrl() && <JsonLd data={{ '@context': 'https://schema.org', '@type': 'WebSite', name: SITE_CONTACT.name, url: getConfiguredSiteUrl(), inLanguage: 'en-IN' }} />}
 
@@ -128,6 +136,8 @@ export default function HomePage() {
           <HowItWorks steps={steps} />
         </div>
       </section>
+
+      <TestimonialsSection testimonials={testimonials} />
 
       <section className="bg-site-ink text-white" aria-labelledby="checklist">
         <div className={`${wrap} py-16 sm:py-24`}>
