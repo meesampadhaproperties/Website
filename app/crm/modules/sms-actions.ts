@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { checkActionAccess } from '@/lib/auth/permissions'
-import { templateVariables } from '@/lib/sms'
+import { SMS_ENABLED, SMS_DISABLED_MESSAGE, templateVariables } from '@/lib/sms'
 
 /** Modules → SMS Templates (MSG91). Super Admin only ('modules' access requires Super Admin). */
 
@@ -29,6 +29,7 @@ export async function getSmsTemplatesAdmin(): Promise<{ templates: SmsTemplate[]
 export async function saveSmsTemplate(input: { id?: string; name: string; msg91_template_id: string; body: string }): Promise<{ success: boolean; template?: SmsTemplate; error?: string }> {
   const auth = await checkActionAccess('modules', 'edit')
   if (!auth.authorized) return { success: false, error: auth.error }
+  if (!SMS_ENABLED) return { success: false, error: SMS_DISABLED_MESSAGE }
 
   const name = String(input?.name || '').trim().slice(0, 80)
   const templateId = String(input?.msg91_template_id || '').trim()
@@ -54,6 +55,7 @@ export async function saveSmsTemplate(input: { id?: string; name: string; msg91_
 export async function setSmsTemplateActive(id: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
   const auth = await checkActionAccess('modules', 'edit')
   if (!auth.authorized) return { success: false, error: auth.error }
+  if (!SMS_ENABLED) return { success: false, error: SMS_DISABLED_MESSAGE }
   if (!UUID_RE.test(String(id || ''))) return { success: false, error: 'Invalid template.' }
   const { error } = await createServiceClient().from('sms_templates')
     .update({ is_active: !!isActive, updated_at: new Date().toISOString() }).eq('id', id)
@@ -65,6 +67,7 @@ export async function setSmsTemplateActive(id: string, isActive: boolean): Promi
 export async function deleteSmsTemplate(id: string): Promise<{ success: boolean; error?: string }> {
   const auth = await checkActionAccess('modules', 'edit')
   if (!auth.authorized) return { success: false, error: auth.error }
+  if (!SMS_ENABLED) return { success: false, error: SMS_DISABLED_MESSAGE }
   if (!UUID_RE.test(String(id || ''))) return { success: false, error: 'Invalid template.' }
   const { error } = await createServiceClient().from('sms_templates').delete().eq('id', id)
   if (error) return { success: false, error: error.message }

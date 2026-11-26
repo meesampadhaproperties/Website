@@ -4,7 +4,9 @@ import { COMPANY_NAME, CONTACT_EMAIL } from './site-config'
 /** Custom emails to leads (REQ-103) through Resend. Server-only. */
 
 export function emailConfigured(): boolean {
-  return !!process.env.RESEND_API_KEY && !!process.env.RESEND_FROM_EMAIL
+  const from = process.env.RESEND_FROM_EMAIL || ''
+  // The template value "...@yourdomain.com" is a placeholder, not a verified sender: treat it as "not set up"
+  return !!process.env.RESEND_API_KEY && !!from && !from.endsWith('@yourdomain.com')
 }
 
 export interface OutgoingEmail {

@@ -1,9 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { MapPin, Download, Crown, CheckCircle2, PlayCircle } from 'lucide-react'
+import Link from 'next/link'
+import { MapPin, Download, Crown, CheckCircle2, PlayCircle, Images } from 'lucide-react'
 import { whatsappLink } from '@/lib/site-config'
 import { WhatsAppIcon } from '@/components/site/WhatsAppIcon'
+import { YouTubeEmbed } from '@/components/site/YouTubeEmbed'
 import type { PublicWebsiteCategory, PublicWebsiteProject } from '@/lib/website-projects'
 
 const pillBase = 'inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border px-4 text-sm font-semibold whitespace-nowrap transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#b87a10]'
@@ -14,7 +16,9 @@ function ProjectCard({ project }: { project: PublicWebsiteProject }) {
     <article className="grid overflow-hidden rounded-2xl border border-[#e8e2d4] bg-[#fbfaf6] shadow-[0_1px_3px_rgba(20,40,29,0.06)] lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       {/* Video frame: always shown, with a placeholder until a video is uploaded */}
       <div className="relative aspect-[4/5] max-h-[75svh] w-full bg-black sm:aspect-video sm:max-h-none lg:aspect-auto lg:min-h-[420px]">
-        {project.video_url ? (
+        {project.youtube_id ? (
+          <YouTubeEmbed id={project.youtube_id} title={`${project.title} video`} fill />
+        ) : project.video_url ? (
           <video
             src={project.video_url}
             controls
@@ -69,6 +73,12 @@ function ProjectCard({ project }: { project: PublicWebsiteProject }) {
             <a href={project.map_url} target="_blank" rel="noopener noreferrer" className={outlineBtn}>
               <MapPin className="h-4 w-4" aria-hidden /> View Location
             </a>
+          )}
+          {project.gallery_photos + project.gallery_videos > 0 && (
+            // Opens the Gallery on this project's videos (or its photos, if it has no videos)
+            <Link href={`/gallery?tab=${project.gallery_videos > 0 ? 'videos' : 'photos'}&project=${project.id}`} className={outlineBtn}>
+              <Images className="h-4 w-4" aria-hidden /> Explore Project Gallery
+            </Link>
           )}
         </div>
 

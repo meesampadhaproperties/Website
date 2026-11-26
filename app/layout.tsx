@@ -1,7 +1,6 @@
 import { COMPANY_NAME } from '@/lib/site-config'
 import type { Metadata } from 'next';
 import './globals.css';
-import { Toaster } from 'sonner';
 import { BrandThemeApplier } from '@/app/crm/settings/brand-settings/BrandThemeApplier';
 import { BRAND_PRELOAD_SCRIPT } from '@/lib/branding';
 import { THEME_PRELOAD_SCRIPT } from '@/lib/theme';
@@ -25,7 +24,6 @@ export default function RootLayout({
       <body className="min-h-screen bg-[#f7f8fa] text-[#0f1d33] antialiased">
         <BrandThemeApplier />
         {children}
-        <Toaster position="top-right" richColors closeButton />
       </body>
     </html>
   );

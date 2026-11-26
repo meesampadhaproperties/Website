@@ -374,3 +374,16 @@ html { scroll-behavior: smooth; }
 .popup-card { animation: popup-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 @keyframes popup-in { from { opacity: 0; transform: translateY(24px) scale(0.98); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .popup-backdrop, .popup-card { animation: none; } }
+
+/* Home testimonials: ONE row that slowly slides left to right. Two identical sets side by side, so -50% → 0 loops seamlessly.
+   Paused on hover/focus, on the Pause button, or while a video plays (data-paused). Very slow on purpose: see --marquee-duration. */
+@keyframes marquee-right { from { transform: translateX(-50%); } to { transform: translateX(0); } }
+.marquee-track { animation: marquee-right var(--marquee-duration, 120s) linear infinite; will-change: transform; }
+.marquee:hover .marquee-track, .marquee:focus-within .marquee-track, .marquee-track[data-paused="true"] { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .marquee-track { animation: none; } }
+
+/* CRM on phones: iPhone Safari zooms into any text box smaller than 16px when you tap it and does not zoom back out.
+   Most CRM boxes use 14px (text-sm), so on phones every box is 16px. Tablets and desktops keep their size. */
+@media (max-width: 767px) {
+  .crm-mobile-inputs :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="hidden"]), select, textarea) { font-size: 16px !important; }
+}

@@ -1,6 +1,7 @@
 'use client'
 
 import { COMPANY_NAME } from '@/lib/site-config'
+import { Toaster } from 'sonner'
 
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
@@ -116,13 +117,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   // Auth pages (login, reset-password) render full screen without sidebar or mobile navigation
   if (isAuthPage) {
-    return <>{children}</>
+    // `contents` keeps the layout exactly as before; the class only switches on the phone input-size rule (globals.css)
+    return <div className="contents crm-mobile-inputs">{children}<Toaster position="top-right" richColors closeButton /></div>
   }
 
   const companyName = COMPANY_NAME
 
   return (
-    <div className="flex min-h-[100dvh] w-full bg-[#f7f8fa] md:h-[100dvh] md:overflow-hidden">
+    <div className="crm-mobile-inputs flex min-h-[100dvh] w-full bg-[#f7f8fa] md:h-[100dvh] md:overflow-hidden">
+      {/* Toasts live here (CRM only), so public website visitors never download the toast library */}
+      <Toaster position="top-right" richColors closeButton />
       {/* Phones: the browser scrolls the page itself (no inner scroll box), so mobile toolbars collapse and nothing is left unpainted.
           md: and up: fixed-height shell with <main> as the scroll area beside the sidebar. */}
       {/* Mobile Top Bar */}
