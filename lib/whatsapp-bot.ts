@@ -4,10 +4,8 @@ import { findLeadsByPhone } from '@/lib/lead-phone'
 import { canonicalPhoneNumber } from '@/lib/phone-input'
 import { mergeEnquiryProjects } from '@/lib/lead-fields'
 import { PROJECT_DOCUMENTS_BUCKET } from '@/lib/project-documents'
-import { videoOpenUrl } from '@/lib/video-link'
-import { websiteMediaUrl } from '@/lib/website-projects'
 import {
-  MAX_DOCUMENTS, MAX_MESSAGE_AGE_SECONDS, clip, documentFileName, parseIncoming, projectRows, projectText, routeAction,
+  MAX_DOCUMENTS, MAX_MESSAGE_AGE_SECONDS, clip, documentFileName, parseIncoming, projectRows, routeAction,
   type WaIncoming,
 } from '@/lib/whatsapp-bot-core'
 
@@ -102,16 +100,16 @@ async function replyProjectList(to: string, page: number) {
     return
   }
   const { rows } = projectRows(projects, page)
-  await sendList(to, 'Choose a project to see its details and documents.', rows)
+  await sendList(to, 'Choose a project to get its documents.', rows)
 }
 
 const FOLLOW_UP_BUTTONS = [{ id: 'explore', title: 'More projects' }, { id: 'contact', title: 'Contact us' }, { id: 'menu', title: 'Main menu' }]
 
-/** Sends the project summary and its documents. Returns the project's title (for the lead history), or null if not found. */
+/** Sends only the project's documents (no details text). Returns the project's title (for the lead history), or null if not found. */
 async function replyProject(to: string, projectId: string): Promise<{ title: string; crmProjectId: string | null; sent: string[] } | null> {
   const db = createServiceClient()
   const { data: p } = await db.from('website_projects')
-    .select('id, title, location, tags, points, map_url, youtube_id, video_path, crm_project_id, website_project_documents(sort_order, project_documents(id, name, doc_type, url, storage_path, mime_type))')
+    .select('id, title, crm_project_id, website_project_documents(sort_order, project_documents(id, name, doc_type, url, storage_path, mime_type))')
     .eq('id', projectId).eq('is_published', true).maybeSingle()
   if (!p) {
     await sendText(to, 'Sorry, that project is no longer available.')
@@ -119,12 +117,6 @@ async function replyProject(to: string, projectId: string): Promise<{ title: str
     return null
   }
 
-  // The project's video: a link (YouTube, Instagram, ...) or an uploaded MP4 in the public website-media bucket
-  const videoKey = (p as any).youtube_id as string | null
-  const videoUrl = videoKey ? videoOpenUrl(videoKey) : websiteMediaUrl(db, (p as any).video_path || null)
-  await sendText(to, projectText({
-    title: p.title, location: p.location, tags: p.tags, points: p.points, mapUrl: p.map_url, videoUrl,
-  }))
 
   const docs = (((p as any).website_project_documents || []) as any[])
     .filter((l) => l.project_documents)
@@ -238,8 +230,8 @@ async function handleMessage(m: WaIncoming) {
     case 'project':
       project = await replyProject(m.from, action.id)
       replied = !project ? 'That project is no longer available. Sent the projects list again.'
-        : project.sent.length ? `Sent the details of "${project.title}" and ${project.sent.length === 1 ? '1 document' : `${project.sent.length} documents`}: ${project.sent.join(', ')}`
-        : `Sent the details of "${project.title}" (no documents yet)`
+        : project.sent.length ? `Sent ${project.sent.length === 1 ? '1 document' : `${project.sent.length} documents`} of "${project.title}": ${project.sent.join(', ')}`
+        : `"${project.title}" has no documents yet (told the customer they are coming soon)`
       break
     case 'contact':
       replied = 'Sent the contact details (phone, email, website)'
