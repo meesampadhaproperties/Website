@@ -122,6 +122,7 @@ export default function ProjectsWorkspaceClient({
   const [docUrl, setDocUrl] = useState('')
   const [docFile, setDocFile] = useState<File | null>(null)
 
+  const selectedArea = areas.find(a => a.id === areaFilter) || null
   const areaName_ = (id: string | null) => areas.find(a => a.id === id)?.name
   const hasUnassigned = projects.some(p => !p.area_id || !areas.some(a => a.id === p.area_id))
 
@@ -308,7 +309,7 @@ export default function ProjectsWorkspaceClient({
   const iconBtn = 'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg cursor-pointer transition-colors'
 
   const pill = (active: boolean) =>
-    `inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${active ? 'bg-[#0f1d33] text-white' : 'bg-white border border-[#e8ecf2] text-[#5a6a82] hover:text-[#0f1d33]'}`
+    `inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${active ? 'bg-[#0f1d33] text-white' : 'bg-white border border-[#e8ecf2] text-[#5a6a82] hover:text-[#0f1d33]'}`
 
   return (
     <div className="w-full overflow-x-hidden px-4 md:px-8 py-4 md:py-6">
@@ -345,6 +346,35 @@ export default function ProjectsWorkspaceClient({
         </div>
         <StorageIndicator refreshKey={storageKey} />
       </div>
+
+      {/* Areas: filter the projects, and rename or delete an area */}
+      {(areas.length > 0 || hasUnassigned) && (
+        <div className="mb-4 rounded-xl border border-[#e8ecf2] bg-white p-3">
+          <p className="mb-2 text-xs font-semibold text-[#5a6a82]">Areas</p>
+          <div className="flex flex-nowrap items-center gap-2 overflow-x-auto overscroll-x-contain pb-2 [-webkit-overflow-scrolling:touch]" role="group" aria-label="Filter by area">
+            <button type="button" onClick={() => setAreaFilter('all')} className={pill(areaFilter === 'all')}>All</button>
+            {areas.map(a => (
+              <button key={a.id} type="button" onClick={() => setAreaFilter(areaFilter === a.id ? 'all' : a.id)} className={pill(areaFilter === a.id)}>
+                <MapPin className="h-3.5 w-3.5" /> {a.name}
+              </button>
+            ))}
+            {hasUnassigned && <button type="button" onClick={() => setAreaFilter(areaFilter === UNASSIGNED ? 'all' : UNASSIGNED)} className={pill(areaFilter === UNASSIGNED)}>Unassigned</button>}
+          </div>
+          {canEdit && selectedArea && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#e8ecf2] pt-3">
+              <span className="mr-1 min-w-0 truncate text-xs font-semibold text-[#0f1d33]">{selectedArea.name}</span>
+              <button type="button" onClick={() => openEditArea(selectedArea)} className={`${secondaryBtn} min-h-[40px]`}>
+                <Pencil className="h-4 w-4 text-[#5a6a82]" /> Rename
+              </button>
+              <button type="button" onClick={() => removeArea(selectedArea)}
+                className="inline-flex min-h-[40px] items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-sm font-semibold text-red-600 cursor-pointer transition-colors hover:bg-red-50">
+                <Trash2 className="h-4 w-4" /> Delete
+              </button>
+            </div>
+          )}
+          {canEdit && areas.length > 0 && areaFilter === 'all' && <p className="mt-2 text-[11px] text-[#8a99ad]">Tap an area to rename or delete it.</p>}
+        </div>
+      )}
 
       {/* Project cards */}
       {visibleProjects.length === 0 ? (

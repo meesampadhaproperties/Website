@@ -1191,14 +1191,14 @@ export default function InboxDashboardClient({
                           {canMessage && (
                             <button type="button" onClick={(e) => { e.stopPropagation(); setComposer({ leads: [lead], channel: 'sms' }); }}
                               disabled={!lead.phone} title={lead.phone ? 'Send SMS' : 'No phone number'} aria-label="Send SMS"
-                              className={`${iconBtn} border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-600 hover:text-white hover:border-sky-600`}>
+                              className={`${iconBtn} ${lead.phone ? 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-600 hover:text-white hover:border-sky-600' : 'border-gray-200 bg-gray-50 text-gray-400 opacity-60 cursor-not-allowed hover:bg-gray-50 hover:text-gray-400 hover:border-gray-200'}`}>
                               <Smartphone className="h-4 w-4" />
                             </button>
                           )}
                           {canMessage && (
                             <button type="button" onClick={(e) => { e.stopPropagation(); setComposer({ leads: [lead], channel: 'email' }); }}
                               disabled={!lead.email} title={lead.email ? `Send email to ${lead.email}` : 'No email address'} aria-label="Send email"
-                              className={`${iconBtn} border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600`}>
+                              className={`${iconBtn} ${lead.email ? 'border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white hover:border-indigo-600' : 'border-gray-200 bg-gray-50 text-gray-400 opacity-60 cursor-not-allowed hover:bg-gray-50 hover:text-gray-400 hover:border-gray-200'}`}>
                               <Mail className="h-4 w-4" />
                             </button>
                           )}

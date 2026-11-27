@@ -34,6 +34,7 @@ const nextConfig = {
     return [
       { source: '/:path+/crm', destination: '/crm', permanent: false },
       { source: '/services', destination: '/projects', permanent: true },
+      { source: '/reviews', destination: '/knowledge-base', permanent: true },
     ];
   },
   async headers() {

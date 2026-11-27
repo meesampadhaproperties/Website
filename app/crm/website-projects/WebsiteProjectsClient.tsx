@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { StorageIndicator } from '@/components/StorageIndicator'
 import { shrinkImage } from '@/lib/image-shrink'
-import { parseYouTubeId, youtubeThumbUrl, youtubeWatchUrl } from '@/lib/youtube'
+import { parseVideoKey, videoLabel, videoOpenUrl, videoThumbUrl } from '@/lib/video-link'
 import {
   WEBSITE_MAX_DOWNLOADS, WEBSITE_MAX_POINTS, WEBSITE_POINT_MAX_CHARS, WEBSITE_MAX_VIDEO_BYTES, WEBSITE_MEDIA_BUCKET, WEBSITE_VIDEO_MIME, isWebsiteDownloadable,
   WEBSITE_TITLE_MAX_CHARS, WEBSITE_LOCATION_MAX_CHARS, WEBSITE_MAX_TAGS, WEBSITE_TAG_MAX_CHARS, WEBSITE_MAP_URL_MAX_CHARS, splitTags,
@@ -230,6 +230,15 @@ function HScroller({ label, children }: { label: string; children: React.ReactNo
   )
 }
 
+/** Picture for a saved/pasted video: the YouTube thumbnail, or a labelled tile for Instagram, Facebook and other sites. */
+function VideoThumb({ k, alt = '' }: { k: string; alt?: string }) {
+  const src = videoThumbUrl(k)
+  return src
+    // eslint-disable-next-line @next/next/no-img-element
+    ? <img src={src} alt={alt} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+    : <span className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#2b3445] to-black px-2 text-center text-xs font-semibold text-white/90">{videoLabel(k)}</span>
+}
+
 /** A video picked in the form but not saved yet: a YouTube id, or an MP4 waiting to be uploaded on Save. */
 type StagedVideo = { key: string; kind: 'youtube' | 'file'; id?: string; file?: File; preview?: string }
 
@@ -397,7 +406,7 @@ export default function WebsiteProjectsClient({
       isPublished: p ? p.is_published : true,
       documentIds: p?.document_ids || [],
       videoMode: p?.youtube_id ? 'youtube' : 'upload',
-      youtubeUrl: p?.youtube_id ? youtubeWatchUrl(p.youtube_id) : '',
+      youtubeUrl: p?.youtube_id ? videoOpenUrl(p.youtube_id) : '',
       videoFile: null,
       videoPreview: null,
       currentVideoUrl: p?.video_url || null,
@@ -424,11 +433,11 @@ export default function WebsiteProjectsClient({
 
   const stageYoutube = () => {
     if (!form) return
-    const id = parseYouTubeId(form.ytDraft)
-    if (!id) return void toast.error('Enter a valid YouTube video link.')
+    const id = parseVideoKey(form.ytDraft)
+    if (!id) return void toast.error('Enter a valid video link (YouTube, Instagram, Facebook or any other).')
     if (extraCount >= WEBSITE_PROJECT_EXTRA_VIDEOS_MAX) return void toast.error(`A project can have up to ${WEBSITE_PROJECT_EXTRA_VIDEOS_MAX} extra videos.`)
     const dup = form.extraVideos.some(v => v.youtube_id === id) || form.newVideos.some(v => v.kind === 'youtube' && v.id === id)
-    if (dup) return void toast.error('That YouTube video is already added.')
+    if (dup) return void toast.error('That video is already added.')
     set({ newVideos: [...form.newVideos, { key: `yt-${id}-${Date.now()}`, kind: 'youtube', id }], ytDraft: '' })
   }
 
@@ -504,7 +513,7 @@ export default function WebsiteProjectsClient({
     if (tagList.length > WEBSITE_MAX_TAGS) return toast.error(`Only ${WEBSITE_MAX_TAGS} tags are allowed.`)
     if (tagList.some(t => t.length > WEBSITE_TAG_MAX_CHARS)) return toast.error(`Each tag can be up to ${WEBSITE_TAG_MAX_CHARS} characters.`)
     const useYoutube = form.videoMode === 'youtube' && form.youtubeUrl.trim() !== ''
-    if (useYoutube && !parseYouTubeId(form.youtubeUrl)) return toast.error('Enter a valid YouTube video link.')
+    if (useYoutube && !parseVideoKey(form.youtubeUrl)) return toast.error('Enter a valid video link (YouTube, Instagram, Facebook or any other).')
 
     setBusy(true)
     try {
@@ -584,7 +593,7 @@ export default function WebsiteProjectsClient({
         const problems: string[] = []
         for (let i = 0; i < form.newVideos.length; i++) {
           const v = form.newVideos[i]
-          if (v.kind === 'youtube') { items.push({ youtubeUrl: youtubeWatchUrl(v.id!) }); continue }
+          if (v.kind === 'youtube') { items.push({ youtubeUrl: videoOpenUrl(v.id!) }); continue }
           setBusyLabel(`Uploading video ${i + 1} of ${form.newVideos.length}…`)
           try {
             const f = v.file!
@@ -642,7 +651,7 @@ export default function WebsiteProjectsClient({
   const openTestimonial = (t: WebsiteTestimonialRow | null) => {
     setTTitle(t?.title || '')
     setTMode(t ? (t.youtube_id ? 'youtube' : 'video') : 'youtube')
-    setTUrl(t?.youtube_id ? youtubeWatchUrl(t.youtube_id) : '')
+    setTUrl(t?.youtube_id ? videoOpenUrl(t.youtube_id) : '')
     setTFile(null)
     setTPreview(null)
     setTCurrent(t?.video_url || null)
@@ -662,7 +671,7 @@ export default function WebsiteProjectsClient({
     if (modal?.type !== 'testimonial') return
     const editing = modal.item
     if (!tTitle.trim()) return toast.error('Testimonial title is required.')
-    if (tMode === 'youtube' && !parseYouTubeId(tUrl)) return toast.error('Enter a valid YouTube video link.')
+    if (tMode === 'youtube' && !parseVideoKey(tUrl)) return toast.error('Enter a valid video link (YouTube, Instagram, Facebook or any other).')
     if (tMode === 'video' && !tFile && !tCurrent) return toast.error('Choose an MP4 video to upload.')
 
     setBusy(true)
@@ -712,7 +721,7 @@ export default function WebsiteProjectsClient({
   // ---------- Reviews (YouTube) ----------
   const openReview = (review: WebsiteReviewRow | null) => {
     setRevTitle(review?.title || '')
-    setRevUrl(review ? youtubeWatchUrl(review.youtube_id) : '')
+    setRevUrl(review ? videoOpenUrl(review.youtube_id) : '')
     setModal({ type: 'review', review })
   }
 
@@ -727,7 +736,7 @@ export default function WebsiteProjectsClient({
     setBusy(false)
     if (!res.success) return toast.error(res.error)
     setReviews(prev => (editing ? prev.map(r => (r.id === editing.id ? res.review! : r)) : [res.review!, ...prev]))
-    toast.success(editing ? 'Review updated' : 'Review added to the website')
+    toast.success(editing ? 'Knowledge base video updated' : 'Knowledge base video added to the website')
     setModal(null)
   }
 
@@ -739,15 +748,15 @@ export default function WebsiteProjectsClient({
       setReviews(prev => prev.map(x => (x.id === r.id ? { ...x, is_published: !next } : x)))
       return toast.error(res.error)
     }
-    toast.success(next ? 'Review shown on the website' : 'Review hidden from the website')
+    toast.success(next ? 'Shown on the website' : 'Hidden from the website')
   }
 
   const removeReview = async (r: WebsiteReviewRow) => {
-    if (!confirm(`Delete the review "${r.title}"?`)) return
+    if (!confirm(`Delete the knowledge base video "${r.title}"?`)) return
     const res = await deleteWebsiteReview(r.id)
     if (!res.success) return toast.error(res.error)
     setReviews(prev => prev.filter(x => x.id !== r.id))
-    toast.success('Review deleted')
+    toast.success('Deleted')
   }
 
   const pill = (active: boolean) =>
@@ -764,13 +773,13 @@ export default function WebsiteProjectsClient({
             <Globe className="h-6 w-6 text-brand shrink-0" /> Website Projects
           </h1>
           <p className="mt-0.5 text-xs md:text-sm text-[#5a6a82]">
-            What visitors see on the website&apos;s <Link href="/projects" target="_blank" className="font-semibold text-[#1e3a5f] underline underline-offset-2">Projects</Link>, <Link href="/gallery" target="_blank" className="font-semibold text-[#1e3a5f] underline underline-offset-2">Gallery</Link> and <Link href="/reviews" target="_blank" className="font-semibold text-[#1e3a5f] underline underline-offset-2">Reviews</Link> pages, and testimonials on the <Link href="/" target="_blank" className="font-semibold text-[#1e3a5f] underline underline-offset-2">home page</Link>. Downloads come from the documents on the CRM Projects page.
+            What visitors see on the website&apos;s <Link href="/projects" target="_blank" className="font-semibold text-[#1e3a5f] underline underline-offset-2">Projects</Link>, <Link href="/gallery" target="_blank" className="font-semibold text-[#1e3a5f] underline underline-offset-2">Gallery</Link> and <Link href="/knowledge-base" target="_blank" className="font-semibold text-[#1e3a5f] underline underline-offset-2">Knowledge base</Link> pages, and testimonials on the <Link href="/" target="_blank" className="font-semibold text-[#1e3a5f] underline underline-offset-2">home page</Link>. Downloads come from the documents on the CRM Projects page.
           </p>
         </div>
         {/* The four action buttons get their own row under the heading: 2 x 2 on phones, one line from tablet up */}
         {canEdit && (
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-            <button onClick={() => openReview(null)} className={`${headerBtn} border border-[#e8ecf2] bg-white text-[#0f1d33] hover:bg-[#f3f5f8]`}><Star className="h-4 w-4 shrink-0 text-brand" /> Add Review</button>
+            <button onClick={() => openReview(null)} className={`${headerBtn} border border-[#e8ecf2] bg-white text-[#0f1d33] hover:bg-[#f3f5f8]`}><Star className="h-4 w-4 shrink-0 text-brand" /> Add Video</button>
             <button onClick={() => openTestimonial(null)} className={`${headerBtn} border border-[#e8ecf2] bg-white text-[#0f1d33] hover:bg-[#f3f5f8]`}><Quote className="h-4 w-4 shrink-0 text-brand" /> Add Testimonial</button>
             <button onClick={() => openCategory(null)} className={`${headerBtn} border border-[#e8ecf2] bg-white text-[#0f1d33] hover:bg-[#f3f5f8]`}><Tag className="h-4 w-4 shrink-0 text-brand" /> Create Category</button>
             <button onClick={() => openProject(null)} className={`${headerBtn} bg-[#0f1d33] text-white hover:bg-[#1e3a5f]`}><Plus className="h-4 w-4 shrink-0" /> Create Project</button>
@@ -841,7 +850,7 @@ export default function WebsiteProjectsClient({
                       <div className="relative aspect-video bg-[#0f1d33]">
                         {p.youtube_id ? (
                           <>
-                            <img src={youtubeThumbUrl(p.youtube_id)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                            <VideoThumb k={p.youtube_id} alt="" />
                             <span className="absolute inset-0 flex items-center justify-center bg-black/25"><span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ff0000] text-white"><Play className="ml-0.5 h-5 w-5 fill-current" /></span></span>
                           </>
                         ) : p.video_url ? (
@@ -917,7 +926,7 @@ export default function WebsiteProjectsClient({
             </h2>
           </div>
           {filteredTestimonials.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-[#e8ecf2] bg-white p-4 text-xs text-[#8a99ad]">{search ? 'No matching testimonials.' : canEdit ? 'No testimonials yet. Use "Add Testimonial" to add a YouTube link or an MP4 video. The home page section appears once you add one.' : 'No testimonials yet.'}</p>
+            <p className="rounded-xl border border-dashed border-[#e8ecf2] bg-white p-4 text-xs text-[#8a99ad]">{search ? 'No matching testimonials.' : canEdit ? 'No testimonials yet. Use "Add Testimonial" to add a video link (YouTube, Instagram, ...) or an MP4 video. The home page section appears once you add one.' : 'No testimonials yet.'}</p>
           ) : (
             <HScroller label="Testimonials">
               {filteredTestimonials.map(t => (
@@ -925,7 +934,7 @@ export default function WebsiteProjectsClient({
                   <div className="relative aspect-video bg-black">
                     {t.youtube_id ? (
                       <>
-                        <img src={youtubeThumbUrl(t.youtube_id)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                        <VideoThumb k={t.youtube_id} alt="" />
                         <span className="absolute inset-0 flex items-center justify-center bg-black/25"><span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ff0000] text-white"><Play className="ml-0.5 h-5 w-5 fill-current" /></span></span>
                       </>
                     ) : (
@@ -955,18 +964,18 @@ export default function WebsiteProjectsClient({
         <section className="mt-8" aria-labelledby="reviews-heading">
           <div className="mb-2 flex items-center justify-between gap-2">
             <h2 id="reviews-heading" className="flex items-center gap-2 text-sm font-bold text-[#0f1d33]">
-              <Star className="h-4 w-4 text-brand" /> Reviews
+              <Star className="h-4 w-4 text-brand" /> Knowledge Base
               <span className="rounded-full bg-[#f3f5f8] px-2 py-0.5 text-[11px] font-semibold text-[#5a6a82]">{reviews.length}</span>
             </h2>
           </div>
           {filteredReviews.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-[#e8ecf2] bg-white p-4 text-xs text-[#8a99ad]">{search ? 'No matching reviews.' : canEdit ? 'No reviews yet. Use "Add Review" to add a YouTube video.' : 'No reviews yet.'}</p>
+            <p className="rounded-xl border border-dashed border-[#e8ecf2] bg-white p-4 text-xs text-[#8a99ad]">{search ? 'No matching videos.' : canEdit ? 'Nothing here yet. Use "Add Video" to add a video link (YouTube, Instagram, ...).' : 'Nothing here yet.'}</p>
           ) : (
-            <HScroller label="Reviews">
+            <HScroller label="Knowledge Base">
               {filteredReviews.map(r => (
                 <article key={r.id} className="flex w-[82vw] max-w-[22rem] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-[#e8ecf2] bg-white shadow-xs sm:w-80">
-                  <a href={youtubeWatchUrl(r.youtube_id)} target="_blank" rel="noopener noreferrer" className="relative block aspect-video bg-black" aria-label={`Open ${r.title} on YouTube`}>
-                    <img src={youtubeThumbUrl(r.youtube_id)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                  <a href={videoOpenUrl(r.youtube_id)} target="_blank" rel="noopener noreferrer" className="relative block aspect-video bg-black" aria-label={`Open ${r.title}`}>
+                    <VideoThumb k={r.youtube_id} alt="" />
                     <span className="absolute inset-0 flex items-center justify-center bg-black/25"><span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#ff0000] text-white"><Play className="ml-0.5 h-5 w-5 fill-current" /></span></span>
                     <span className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-bold ${r.is_published ? 'bg-emerald-500 text-white' : 'bg-white/90 text-[#5a6a82]'}`}>{r.is_published ? 'LIVE' : 'HIDDEN'}</span>
                   </a>
@@ -999,27 +1008,27 @@ export default function WebsiteProjectsClient({
                 {(['youtube', 'video'] as const).map(m => (
                   <button key={m} type="button" role="tab" aria-selected={tMode === m} onClick={() => setTMode(m)}
                     className={`inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-md text-xs font-semibold cursor-pointer ${tMode === m ? 'bg-white text-[#0f1d33] shadow-xs' : 'text-[#5a6a82]'}`}>
-                    {m === 'youtube' ? <><Link2 className="h-4 w-4" /> YouTube link</> : <><Upload className="h-4 w-4" /> Upload MP4</>}
+                    {m === 'youtube' ? <><Link2 className="h-4 w-4" /> Video link</> : <><Upload className="h-4 w-4" /> Upload MP4</>}
                   </button>
                 ))}
               </div>
 
               {tMode === 'youtube' ? (
                 <div className="mt-2">
-                  <label className={labelCls}>YouTube video link
-                    <input type="url" value={tUrl} onChange={(e) => setTUrl(e.target.value.slice(0, 300))} placeholder="https://www.youtube.com/watch?v=..." className={`${inputCls} mt-1`} />
+                  <label className={labelCls}>Video link (YouTube, Instagram, Facebook or any link)
+                    <input type="url" value={tUrl} onChange={(e) => setTUrl(e.target.value.slice(0, 500))} placeholder="Paste any video link, e.g. YouTube or Instagram" className={`${inputCls} mt-1`} />
                   </label>
                   {tUrl.trim() !== '' && (() => {
-                    const yid = parseYouTubeId(tUrl)
+                    const yid = parseVideoKey(tUrl)
                     return yid ? (
                       <div className="mt-2 overflow-hidden rounded-lg border border-[#e8ecf2]">
                         <div className="relative aspect-video bg-black">
-                          <img src={youtubeThumbUrl(yid)} alt="YouTube preview" className="absolute inset-0 h-full w-full object-cover" />
+                          <VideoThumb k={yid} alt="Video preview" />
                           <span className="absolute inset-0 flex items-center justify-center bg-black/25"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#ff0000] text-white"><Play className="ml-0.5 h-5 w-5 fill-current" /></span></span>
                         </div>
                         <p className="p-2 text-[11px] text-[#5a6a82]">Preview. Visitors play it on the home page. {modal.item?.video_url ? 'The uploaded MP4 is removed when you save, to free storage.' : 'No storage used.'}</p>
                       </div>
-                    ) : <p className="mt-1 text-[11px] font-semibold text-red-600">That is not a valid YouTube video link.</p>
+                    ) : <p className="mt-1 text-[11px] font-semibold text-red-600">That is not a valid video link.</p>
                   })()}
                 </div>
               ) : (tPreview || tCurrent) ? (
@@ -1049,23 +1058,23 @@ export default function WebsiteProjectsClient({
 
       {/* Review modal */}
       {modal?.type === 'review' && (
-        <Modal title={modal.review ? 'Edit Review' : 'Add Review'} onClose={closeModal}>
+        <Modal title={modal.review ? 'Edit Video' : 'Add Video'} onClose={closeModal}>
           <form onSubmit={submitReview} className="flex flex-col gap-3">
             <LimitedInput label="Review title (what the video is about)" required max={WEBSITE_REVIEW_TITLE_MAX_CHARS} value={revTitle} onChange={setRevTitle} placeholder="e.g. Customer review: Arudra Exotica Villas" />
-            <LimitedInput label="YouTube video link" type="url" required max={300} value={revUrl} onChange={setRevUrl} placeholder="https://www.youtube.com/watch?v=..." />
+            <LimitedInput label="Video link (YouTube, Instagram, Facebook or any link)" type="url" required max={500} value={revUrl} onChange={setRevUrl} placeholder="Paste any video link, e.g. YouTube or Instagram" />
             {revUrl.trim() !== '' && (() => {
-              const yid = parseYouTubeId(revUrl)
+              const yid = parseVideoKey(revUrl)
               return yid ? (
                 <div className="overflow-hidden rounded-lg border border-[#e8ecf2]">
                   <div className="relative aspect-video bg-black">
-                    <img src={youtubeThumbUrl(yid)} alt="YouTube preview" className="absolute inset-0 h-full w-full object-cover" />
+                    <VideoThumb k={yid} alt="Video preview" />
                     <span className="absolute inset-0 flex items-center justify-center bg-black/25"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#ff0000] text-white"><Play className="ml-0.5 h-5 w-5 fill-current" /></span></span>
                   </div>
-                  <p className="p-2 text-[11px] text-[#5a6a82]">Preview. Visitors play it on the website Reviews page.</p>
+                  <p className="p-2 text-[11px] text-[#5a6a82]">Preview. Visitors play it on the website Knowledge base page.</p>
                 </div>
-              ) : <p className="text-[11px] font-semibold text-red-600">That is not a valid YouTube video link. Use youtube.com/watch, youtu.be or a Shorts link.</p>
+              ) : <p className="text-[11px] font-semibold text-red-600">That is not a valid video link.</p>
             })()}
-            <button type="submit" disabled={busy} className={primaryBtn}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} {modal.review ? 'Save Review' : 'Add Review'}</button>
+            <button type="submit" disabled={busy} className={primaryBtn}>{busy && <Loader2 className="h-4 w-4 animate-spin" />} {modal.review ? 'Save Video' : 'Add Video'}</button>
           </form>
         </Modal>
       )}
@@ -1109,25 +1118,25 @@ export default function WebsiteProjectsClient({
                 {(['upload', 'youtube'] as const).map(m => (
                   <button key={m} type="button" role="tab" aria-selected={form.videoMode === m} onClick={() => set({ videoMode: m })}
                     className={`inline-flex min-h-[40px] items-center justify-center gap-1.5 rounded-md text-xs font-semibold cursor-pointer ${form.videoMode === m ? 'bg-white text-[#0f1d33] shadow-xs' : 'text-[#5a6a82]'}`}>
-                    {m === 'upload' ? <><Upload className="h-4 w-4" /> Upload MP4</> : <><Link2 className="h-4 w-4" /> YouTube link</>}
+                    {m === 'upload' ? <><Upload className="h-4 w-4" /> Upload MP4</> : <><Link2 className="h-4 w-4" /> Video link</>}
                   </button>
                 ))}
               </div>
 
               {form.videoMode === 'youtube' ? (
                 <div className="mt-2">
-                  <LimitedInput label="YouTube video link" type="url" max={300} value={form.youtubeUrl} onChange={(v) => set({ youtubeUrl: v })} placeholder="https://www.youtube.com/watch?v=..." />
+                  <LimitedInput label="Video link (YouTube, Instagram, Facebook or any link)" type="url" max={500} value={form.youtubeUrl} onChange={(v) => set({ youtubeUrl: v })} placeholder="Paste any video link, e.g. YouTube or Instagram" />
                   {form.youtubeUrl.trim() !== '' && (() => {
-                    const yid = parseYouTubeId(form.youtubeUrl)
+                    const yid = parseVideoKey(form.youtubeUrl)
                     return yid ? (
                       <div className="mt-2 overflow-hidden rounded-lg border border-[#e8ecf2]">
                         <div className="relative aspect-video bg-black">
-                          <img src={youtubeThumbUrl(yid)} alt="YouTube preview" className="absolute inset-0 h-full w-full object-cover" />
+                          <VideoThumb k={yid} alt="Video preview" />
                           <span className="absolute inset-0 flex items-center justify-center bg-black/25"><span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#ff0000] text-white"><Play className="ml-0.5 h-5 w-5 fill-current" /></span></span>
                         </div>
                         <p className="p-2 text-[11px] text-[#5a6a82]">Preview. Visitors play it on the website. {form.currentVideoUrl ? 'The uploaded MP4 is removed when you save, to free storage.' : 'No storage used.'}</p>
                       </div>
-                    ) : <p className="mt-1 text-[11px] font-semibold text-red-600">That is not a valid YouTube video link.</p>
+                    ) : <p className="mt-1 text-[11px] font-semibold text-red-600">That is not a valid video link.</p>
                   })()}
                 </div>
               ) : (form.videoPreview || (form.currentVideoUrl && !form.removeVideo)) ? (
@@ -1223,7 +1232,7 @@ export default function WebsiteProjectsClient({
                   {form.extraVideos.map(v => (
                     <div key={v.id} className="relative aspect-video overflow-hidden rounded-lg border border-[#e8ecf2] bg-black">
                       {v.youtube_id ? (
-                        <><img src={youtubeThumbUrl(v.youtube_id)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" /><span className="absolute inset-0 flex items-center justify-center bg-black/25"><Play className="h-6 w-6 fill-white text-white" /></span></>
+                        <><VideoThumb k={v.youtube_id} alt="" /><span className="absolute inset-0 flex items-center justify-center bg-black/25"><Play className="h-6 w-6 fill-white text-white" /></span></>
                       ) : (
                         <video src={v.video_url!} muted playsInline preload="metadata" className="absolute inset-0 h-full w-full object-contain" />
                       )}
@@ -1233,7 +1242,7 @@ export default function WebsiteProjectsClient({
                   {form.newVideos.map(v => (
                     <div key={v.key} className="relative aspect-video overflow-hidden rounded-lg border-2 border-dashed border-brand bg-black">
                       {v.kind === 'youtube' ? (
-                        <><img src={youtubeThumbUrl(v.id!)} alt="" className="absolute inset-0 h-full w-full object-cover" /><span className="absolute inset-0 flex items-center justify-center bg-black/25"><Play className="h-6 w-6 fill-white text-white" /></span></>
+                        <><VideoThumb k={v.id!} alt="" /><span className="absolute inset-0 flex items-center justify-center bg-black/25"><Play className="h-6 w-6 fill-white text-white" /></span></>
                       ) : (
                         <video src={v.preview} muted playsInline preload="metadata" className="absolute inset-0 h-full w-full object-contain" />
                       )}
@@ -1251,8 +1260,8 @@ export default function WebsiteProjectsClient({
                     value={form.ytDraft}
                     onChange={(e) => set({ ytDraft: e.target.value.slice(0, 300) })}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); stageYoutube() } }}
-                    placeholder="Paste a YouTube link"
-                    aria-label="YouTube link for an extra video"
+                    placeholder="Paste a video link (YouTube, Instagram, ...)"
+                    aria-label="Video link for an extra video"
                     className={`${inputCls} min-w-0 flex-1`}
                   />
                   <div className="grid grid-cols-2 gap-2 sm:flex">

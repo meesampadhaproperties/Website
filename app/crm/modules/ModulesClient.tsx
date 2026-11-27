@@ -31,6 +31,7 @@ import SmsTemplatesManager from './components/SmsTemplatesManager'
 import SmsTemplatesDisabled from './components/SmsTemplatesDisabled'
 import { SMS_ENABLED } from '@/lib/sms'
 import EnquiryTypeManager from './components/EnquiryTypeManager'
+import EmailTemplate from './components/EmailTemplate'
 
 interface ModulesClientProps {
   initialRecipients: ReportRecipient[]
@@ -397,6 +398,11 @@ export default function ModulesClient({ initialRecipients, initialWaRecipients, 
       {/* Enquiry Types Module */}
       <div className="mb-6">
         <EnquiryTypeManager />
+      </div>
+
+      {/* Welcome Email Template Module */}
+      <div className="mb-6">
+        <EmailTemplate />
       </div>
 
       {/* SMS Templates (MSG91) Module */}

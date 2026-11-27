@@ -4,7 +4,12 @@ export const SITE_NAV = [
   { href: '/about', label: 'About' },
   { href: '/projects', label: 'Projects' },
   { href: '/gallery', label: 'Gallery' },
-  { href: '/reviews', label: 'Reviews' },
+  { href: '/knowledge-base', label: 'Knowledge base' },
+]
+
+// Extra footer-only quick link (not in the header menu).
+export const FOOTER_EXTRA_NAV = [
+  { href: '/careers', label: 'Careers' },
 ]
 
 // Footer-only legal links. /data-deletion is NOT linked (owner's choice) but stays live:
