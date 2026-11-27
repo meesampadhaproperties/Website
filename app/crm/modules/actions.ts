@@ -5,9 +5,11 @@ import { COMPANY_NAME } from '@/lib/site-config'
 import { revalidatePath } from 'next/cache'
 import { createClient, createServiceClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { issueVerificationCode, consumeVerificationCode } from '@/lib/verification-codes'
-import { buildLeadReport, sendReportEmail, sendReportWhatsApp, sendWhatsAppOtp, currentIstSlot, istToUtc } from '@/lib/reports/lead-report'
+import { buildLeadReport, sendReportEmail, sendReportWhatsApp, sendWhatsAppOtp, currentIstSlot, windowForSlot, REPORT_SLOTS, reportFileNames, type ReportFile } from '@/lib/reports/lead-report'
+import { buildReportWorkbook } from '@/lib/reports/report-excel'
 import { Resend } from 'resend'
-import { normalizeWaRecipientPhone, normalizeWaReportTimings } from '@/lib/phone-input'
+import { normalizeWaRecipientPhone } from '@/lib/phone-input'
+import { DEFAULT_REPORT_TIMES, masterTimesFor, normalizeReportTimes } from '@/lib/reports/slots'
 
 // ----------------------------------------------------------------------
 // REPORT RECIPIENTS ACTIONS
@@ -19,6 +21,8 @@ export interface ReportRecipient {
   name: string | null
   created_at: string
   report_times?: string[] | null
+  /** Slots (a subset of report_times) at which the master report (every lead so far) is attached too */
+  master_times?: string[] | null
 }
 
 /**
@@ -103,7 +107,7 @@ export async function addReportRecipient(email: string, name?: string | null): P
 
 export async function updateReportRecipient(
   id: string,
-  updates: { name?: string | null; email?: string; report_times?: string[] | null }
+  updates: { name?: string | null; email?: string; report_times?: string[] | null; master_times?: string[] | null }
 ): Promise<{ success: boolean, error?: string }> {
   try {
     await requireAuthenticatedAdmin()
@@ -118,8 +122,12 @@ export async function updateReportRecipient(
       payload.email = updates.email.trim().toLowerCase()
     }
 
-    if (updates.report_times !== undefined) {
-      payload.report_times = updates.report_times
+    if (updates.report_times !== undefined || updates.master_times !== undefined) {
+      // The master report can only ride on a slot the person receives: work out both lists together
+      const { data: cur } = await supabase.from('report_recipients').select('report_times, master_times').eq('id', id).maybeSingle()
+      const times = updates.report_times !== undefined ? normalizeReportTimes(updates.report_times) : normalizeReportTimes(cur?.report_times)
+      payload.report_times = times
+      payload.master_times = masterTimesFor(times, updates.master_times !== undefined ? updates.master_times : cur?.master_times)
     }
 
     // Helper: attempt an upsert/update, and if it fails because
@@ -127,7 +135,7 @@ export async function updateReportRecipient(
     const stripTimingsAndRetry = (err: any, payloadObj: Record<string, any>): Record<string, any> | null => {
       const msg = String(err?.message || err?.code || '')
       if (msg.includes('report_times') && 'report_times' in payloadObj) {
-        const { report_times: _dropped, ...rest } = payloadObj
+        const { report_times: _dropped, master_times: _m, ...rest } = payloadObj
         return rest
       }
       return null
@@ -198,12 +206,16 @@ export async function removeReportRecipient(id: string): Promise<{ success: bool
  * Sends a real test report through the SAME builder/sender as the scheduled cron.
  * testHour (IST 0-23) → the window is the 3 hours ending at that hour today; otherwise the last 3 hours.
  */
-export async function testReportEmail(email: string, testHour?: number): Promise<{ success: boolean, error?: string }> {
+export async function testReportEmail(email: string, testHour?: number, withMaster = false): Promise<{ success: boolean, error?: string }> {
   try {
     await requireAuthenticatedAdmin()
     const { start, end } = testWindow(testHour)
-    const report = await buildLeadReport(createServiceClient(), start, end)
-    await sendReportEmail(String(email).trim(), report, true)
+    const db = createServiceClient()
+    const report = await buildLeadReport(db, start, end)
+    const names = reportFileNames(report)
+    const files: ReportFile[] = [{ filename: names.report, content: await buildReportWorkbook(db, start, end) }]
+    if (withMaster) files.push({ filename: names.master, content: await buildReportWorkbook(db, start, end, true) })
+    await sendReportEmail(String(email).trim(), report, true, files)
     return { success: true }
   } catch (err: any) {
     console.error('Error sending test report email:', err)
@@ -211,11 +223,14 @@ export async function testReportEmail(email: string, testHour?: number): Promise
   }
 }
 
+/** The window of the chosen slot (e.g. 9 PM → 6 PM – 9 PM today). Without a slot: the 3 hours up to now. */
 function testWindow(testHour?: number): { start: Date; end: Date } {
   const { date } = currentIstSlot()
-  const end = typeof testHour === 'number' && testHour >= 0 && testHour <= 23
-    ? istToUtc(date, `${String(testHour).padStart(2, '0')}:00`)
-    : new Date()
+  if (typeof testHour === 'number') {
+    const slot = `${String(testHour).padStart(2, '0')}:00`
+    if ((REPORT_SLOTS as readonly string[]).includes(slot)) return windowForSlot(date, slot)
+  }
+  const end = new Date()
   return { start: new Date(end.getTime() - 3 * 60 * 60 * 1000), end }
 }
 
@@ -280,7 +295,11 @@ export interface WaRecipient {
   name: string | null
   created_at: string
   report_times?: string[] | null
+  master_times?: string[] | null
 }
+
+/** The table's column is `phone`; the screens use `phone_number`. */
+const toWaRecipient = (r: any): WaRecipient => ({ ...r, phone_number: r.phone })
 
 export async function getWaRecipients(): Promise<{ data: WaRecipient[], error: string | null }> {
   try {
@@ -296,7 +315,7 @@ export async function getWaRecipients(): Promise<{ data: WaRecipient[], error: s
       return { data: [], error: null }
     }
 
-    return { data: data || [], error: null }
+    return { data: (data || []).map(toWaRecipient), error: null }
   } catch (err: any) {
     console.error('Error fetching WA recipients:', err)
     return { data: [], error: null }
@@ -306,7 +325,8 @@ export async function getWaRecipients(): Promise<{ data: WaRecipient[], error: s
 export async function addWaRecipient(
   phone_number: string, 
   name?: string | null,
-  report_times?: string[] | null
+  report_times?: string[] | null,
+  master_times?: string[] | null
 ): Promise<{ success: boolean, data?: WaRecipient, error?: string }> {
   try {
     await requireAuthenticatedAdmin()
@@ -321,8 +341,8 @@ export async function addWaRecipient(
     // 2. Check for duplicate phone number
     const { data: existing } = await supabase
       .from('whatsapp_report_recipients')
-      .select('id, name, phone_number')
-      .eq('phone_number', clean.phone)
+      .select('id, name, phone')
+      .eq('phone', clean.phone)
       .maybeSingle()
 
     if (existing) {
@@ -333,14 +353,15 @@ export async function addWaRecipient(
     }
 
     // 3. Ensure report_times defaults to all active slots
-    const timesToSave = normalizeWaReportTimings(report_times)
+    const timesToSave = normalizeReportTimes(report_times).length ? normalizeReportTimes(report_times) : DEFAULT_REPORT_TIMES
 
     const { data, error } = await supabase
       .from('whatsapp_report_recipients')
       .insert([{ 
-        phone_number: clean.phone,
+        phone: clean.phone,
         name: name && name.trim() ? name.trim() : null,
-        report_times: timesToSave
+        report_times: timesToSave,
+        master_times: masterTimesFor(timesToSave, master_times),
       }])
       .select()
       .single()
@@ -353,7 +374,7 @@ export async function addWaRecipient(
     }
 
     revalidatePath('/crm/modules')
-    return { success: true, data: data as WaRecipient }
+    return { success: true, data: toWaRecipient(data) }
   } catch (err: any) {
     console.error('Error adding WA recipient:', err)
     return { success: false, error: err.message || 'Failed to add WhatsApp number' }
@@ -362,7 +383,7 @@ export async function addWaRecipient(
 
 export async function updateWaRecipient(
   id: string, 
-  updates: { name?: string | null; phone_number?: string; report_times?: string[] | null }
+  updates: { name?: string | null; phone_number?: string; report_times?: string[] | null; master_times?: string[] | null }
 ): Promise<{ success: boolean, data?: WaRecipient, error?: string }> {
   try {
     await requireAuthenticatedAdmin()
@@ -395,11 +416,11 @@ export async function updateWaRecipient(
       }
 
       // If phone changed, ensure no collision with another recipient
-      if (clean.phone !== current.phone_number) {
+      if (clean.phone !== current.phone) {
         const { data: duplicate } = await supabase
           .from('whatsapp_report_recipients')
           .select('id, name')
-          .eq('phone_number', clean.phone)
+          .eq('phone', clean.phone)
           .neq('id', id)
           .maybeSingle()
 
@@ -411,11 +432,13 @@ export async function updateWaRecipient(
         }
       }
 
-      payload.phone_number = clean.phone
+      payload.phone = clean.phone
     }
 
-    if (updates.report_times !== undefined) {
-      payload.report_times = normalizeWaReportTimings(updates.report_times)
+    if (updates.report_times !== undefined || updates.master_times !== undefined) {
+      const times = updates.report_times !== undefined ? normalizeReportTimes(updates.report_times) : normalizeReportTimes(current.report_times)
+      payload.report_times = times
+      payload.master_times = masterTimesFor(times, updates.master_times !== undefined ? updates.master_times : current.master_times)
     }
 
     const { data, error } = await supabase
@@ -429,7 +452,7 @@ export async function updateWaRecipient(
       // Fallback if report_times column issue
       const msg = String(error?.message || '')
       if (msg.includes('report_times') && 'report_times' in payload) {
-        const { report_times: _dropped, ...fallback } = payload
+        const { report_times: _dropped, master_times: _m, ...fallback } = payload
         if (Object.keys(fallback).length > 0) {
           const { data: d2, error: e2 } = await supabase
             .from('whatsapp_report_recipients')
@@ -439,7 +462,7 @@ export async function updateWaRecipient(
             .single()
           if (e2) throw e2
           revalidatePath('/crm/modules')
-          return { success: true, data: d2 as WaRecipient }
+          return { success: true, data: toWaRecipient(d2) }
         }
       }
       if (error.code === '23505' || String(error.message).includes('unique constraint')) {
@@ -449,7 +472,7 @@ export async function updateWaRecipient(
     }
 
     revalidatePath('/crm/modules')
-    return { success: true, data: data as WaRecipient }
+    return { success: true, data: toWaRecipient(data) }
   } catch (err: any) {
     console.error('Error updating WA recipient:', err)
     return { success: false, error: err.message || 'Failed to update WhatsApp recipient' }
@@ -514,14 +537,14 @@ export async function verifyAndAddWa(phone: string, otp: string): Promise<{ succ
   }
 }
 
-export async function testReportWa(phone: string, testHour?: number): Promise<{ success: boolean, error?: string }> {
+export async function testReportWa(phone: string, testHour?: number, withMaster = false): Promise<{ success: boolean, error?: string }> {
   try {
     await requireAuthenticatedAdmin()
     const normalized = normalizeWaRecipientPhone(phone)
     if (!normalized.valid) return { success: false, error: normalized.error || 'Invalid phone number.' }
     const { start, end } = testWindow(testHour)
     const report = await buildLeadReport(createServiceClient(), start, end)
-    await sendReportWhatsApp(normalized.phone, report)
+    await sendReportWhatsApp(normalized.phone, report, withMaster)
     return { success: true }
   } catch (err: any) {
     console.error('Error testing report WA:', err)

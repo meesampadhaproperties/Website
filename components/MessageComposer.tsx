@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import { phoneMatchKey } from '@/lib/lead-phone'
 import { PERSONALIZE_HINT, isValidEmail, personalize, smsAppUrl, whatsappChatUrl, type OutreachLead } from '@/lib/outreach'
 import { SMS_ENABLED, SMS_DISABLED_MESSAGE, SMS_VALUE_MAX, fillTemplate, templateVariables } from '@/lib/sms'
-import { getMessagingSetup, logOutreach, sendEmailToLeads, sendSmsToLeads, type SendSummary } from '@/app/crm/messaging/actions'
+import { getMessagingSetup, getWhatsAppBotWindow, logOutreach, sendEmailToLeads, sendSmsToLeads, sendWhatsAppViaBot, type SendSummary } from '@/app/crm/messaging/actions'
 
 export type MessageChannel = 'email' | 'sms' | 'whatsapp'
 
@@ -31,7 +31,7 @@ export default function MessageComposer({
   onClose: () => void
 }) {
   const [channel, setChannel] = useState<MessageChannel>(initialChannel)
-  const [setup, setSetup] = useState<{ email: boolean; smsKey: boolean; smsTemplates: { id: string; name: string; body: string }[] } | null>(null)
+  const [setup, setSetup] = useState<{ email: boolean; smsKey: boolean; waBot: boolean; smsTemplates: { id: string; name: string; body: string }[] } | null>(null)
   const [subject, setSubject] = useState('')
   const [emailBody, setEmailBody] = useState('')
   const [smsMode, setSmsMode] = useState<'template' | 'phone'>('template')
@@ -40,7 +40,9 @@ export default function MessageComposer({
   const [customText, setCustomText] = useState('')
   const [opened, setOpened] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
-  const [summary, setSummary] = useState<SendSummary | null>(null)
+  const [summary, setSummary] = useState<(SendSummary & { outside?: number }) | null>(null)
+  const [waMode, setWaMode] = useState<'chat' | 'bot'>('chat')
+  const [waWindow, setWaWindow] = useState<{ inWindow: number; outside: number; noPhone: number } | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -48,7 +50,7 @@ export default function MessageComposer({
       setSetup(res)
       if (!res.smsKey || res.smsTemplates.length === 0) setSmsMode('phone')
       if (res.smsTemplates.length === 1) pickTemplate(res.smsTemplates[0])
-    }).catch(() => setSetup({ email: false, smsKey: false, smsTemplates: [] }))
+    }).catch(() => setSetup({ email: false, smsKey: false, waBot: false, smsTemplates: [] }))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -80,7 +82,17 @@ export default function MessageComposer({
   const ids = leads.map((l) => l.id)
   const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`
 
-  const run = async (fn: () => Promise<SendSummary | { error: string }>, what: string) => {
+  // How many of these people can be messaged for free by the bot (they wrote to it in the last 24 hours)
+  useEffect(() => {
+    if (channel !== 'whatsapp' || waMode !== 'bot' || summary) return
+    let alive = true
+    setWaWindow(null)
+    getWhatsAppBotWindow(leads.map((l) => l.id)).then((r) => { if (alive) setWaWindow({ inWindow: r.inWindow, outside: r.outside, noPhone: r.noPhone }) }).catch(() => {})
+    return () => { alive = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channel, waMode, summary])
+
+  const run = async (fn: () => Promise<(SendSummary & { outside?: number }) | { error: string }>, what: string) => {
     setBusy(true)
     setError('')
     try {
@@ -106,7 +118,7 @@ export default function MessageComposer({
     logOutreach(lead.id, channel === 'whatsapp' ? 'whatsapp' : 'sms_phone', text).catch(() => {})
   }
   const nextLead = withPhone.find((l) => !opened.has(l.id))
-  const usingQueue = channel === 'whatsapp' || (channel === 'sms' && smsMode === 'phone')
+  const usingQueue = (channel === 'whatsapp' && waMode === 'chat') || (channel === 'sms' && smsMode === 'phone')
 
   const input = 'w-full min-h-[44px] rounded-lg border border-[#e8ecf2] bg-[#f8fafc] px-3 text-sm text-[#0f1d33] focus:outline-none focus:ring-1 focus:ring-[#0f1d33]'
   const tab = (c: MessageChannel, label: string, Icon: React.ElementType, count: number) => (
@@ -145,6 +157,7 @@ export default function MessageComposer({
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" /> {summary.sent} sent</span>
                 {summary.failed > 0 && <span className="rounded-full bg-red-50 px-3 py-1 text-red-700">{summary.failed} not sent</span>}
                 {summary.skipped > 0 && <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-800">{summary.skipped} skipped ({channel === 'email' ? 'no email' : 'no valid mobile'})</span>}
+                {(summary.outside || 0) > 0 && <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-800">{summary.outside} not sent (no message from them in the last 24 hours)</span>}
               </div>
               {summary.errors.length > 0 && <ul className="list-disc space-y-1 pl-5 text-xs text-red-700">{summary.errors.map((e) => <li key={e}>{e}</li>)}</ul>}
               <p className="text-xs text-[#8a99ad]">Each message is saved in the lead&apos;s history.</p>
@@ -222,6 +235,44 @@ export default function MessageComposer({
                   </>
                 )
               ) : null}
+
+              {channel === 'whatsapp' && (
+                <div className="grid grid-cols-2 gap-1 rounded-lg bg-[#f3f5f8] p-1 text-xs font-semibold" role="group" aria-label="WhatsApp type">
+                  {(['chat', 'bot'] as const).map((m) => (
+                    <button key={m} type="button" onClick={() => { setWaMode(m); setError(''); setOpened(new Set()) }}
+                      className={`min-h-[40px] rounded-md px-2 cursor-pointer ${waMode === m ? 'bg-white text-[#0f1d33] shadow-xs' : 'text-[#5a6a82]'}`}>
+                      {m === 'chat' ? 'Open in WhatsApp (my phone)' : 'Send by bot (automatic)'}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {channel === 'whatsapp' && waMode === 'bot' && (
+                !setup.waBot ? (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-900">The WhatsApp bot isn&apos;t set up yet (WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID in Vercel).</p>
+                ) : (
+                  <>
+                    <label className="block text-xs font-semibold text-[#5a6a82]">Message
+                      <textarea value={customText} onChange={(e) => setCustomText(e.target.value)} rows={5} maxLength={2000} placeholder={'Hi {name}, we have a new update on {project}...'} className={`${input} mt-1 py-2 resize-y`} />
+                    </label>
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-xs text-emerald-900">
+                      <p className="font-semibold">Free: sent from the bot number, only to people who messaged it in the last 24 hours.</p>
+                      <p className="mt-1">
+                        {!waWindow ? 'Checking who can receive it...'
+                          : `${plural(waWindow.inWindow, 'lead')} can receive it now${waWindow.outside ? `; ${waWindow.outside} messaged longer ago (or never) and will be skipped` : ''}${waWindow.noPhone ? `; ${waWindow.noPhone} have no valid mobile` : ''}.`}
+                      </p>
+                      {waWindow && waWindow.outside > 0 && <p className="mt-1 text-emerald-800">For the skipped ones, use &quot;Open in WhatsApp (my phone)&quot;.</p>}
+                    </div>
+                    <p className="text-[11px] text-[#8a99ad]">{PERSONALIZE_HINT} Each message is saved in the lead&apos;s WhatsApp Activity.</p>
+                    {error && <p className="text-xs font-semibold text-red-600" role="alert">{error}</p>}
+                    <button type="button" disabled={busy || !customText.trim() || !waWindow || waWindow.inWindow === 0}
+                      onClick={() => run(() => sendWhatsAppViaBot(ids, customText), 'WhatsApp message')}
+                      className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-[#1ea952] px-4 text-sm font-semibold text-white hover:bg-[#178a43] disabled:opacity-60 cursor-pointer">
+                      {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />} Send by bot{waWindow && waWindow.inWindow > 1 ? ` to ${waWindow.inWindow} leads` : ''}
+                    </button>
+                  </>
+                )
+              )}
 
               {usingQueue && (
                 <>

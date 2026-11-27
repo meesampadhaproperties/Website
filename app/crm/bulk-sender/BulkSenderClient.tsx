@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, ChevronDown, Loader2, Mail, Phone, Search, Send, Smartphone, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, Loader2, Mail, Phone, Search, Send, Smartphone, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import MessageComposer, { type MessageChannel } from '@/components/MessageComposer'
 import { SmsWalletCard } from '@/components/SmsWalletCard'
@@ -10,7 +10,7 @@ import { SMS_ENABLED, SMS_DISABLED_MESSAGE } from '@/lib/sms'
 import { isAutoCapturedLead, sourceLabel } from '@/lib/lead-source'
 import { isValidEmail } from '@/lib/outreach'
 import { phoneMatchKey } from '@/lib/lead-phone'
-import { getBulkLeads, getBulkLeadsForSelection, type BulkFilters, type BulkLead } from './actions'
+import { deleteBulkLeads, getBulkLeads, getBulkLeadsForSelection, type BulkFilters, type BulkLead } from './actions'
 
 const PAGE_SIZE = 50
 
@@ -30,13 +30,15 @@ const WhatsAppGlyph = (p: React.SVGProps<SVGSVGElement>) => (
  * Email, an SMS or a WhatsApp message. Table on wide screens (no sideways scrolling), cards below.
  */
 export default function BulkSenderClient({
-  options, initialLeads, initialCount, canSend,
+  options, initialLeads, initialCount, canSend, canDelete,
 }: {
   options: Options
   initialLeads: BulkLead[]
   initialCount: number
   /** 'edit' on Bulk Sender. View-only users can browse but not send. */
   canSend: boolean
+  /** Super Admin with 'edit' on Bulk Sender: may delete leads */
+  canDelete: boolean
 }) {
   const [search, setSearch] = useState('')
   const [debounced, setDebounced] = useState('')
@@ -51,6 +53,9 @@ export default function BulkSenderClient({
   const [composer, setComposer] = useState<{ leads: BulkLead[]; channel: MessageChannel } | null>(null)
   const [walletKey, setWalletKey] = useState(0)
   const firstLoad = useRef(true)
+  const [reloadKey, setReloadKey] = useState(0)
+  const [deleteTargets, setDeleteTargets] = useState<BulkLead[] | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => { const t = setTimeout(() => setDebounced(search), 350); return () => clearTimeout(t) }, [search])
   const filters: BulkFilters = useMemo(() => ({ search: debounced, source, status }), [debounced, source, status])
@@ -64,7 +69,7 @@ export default function BulkSenderClient({
       .then((res) => { if (!alive) return; if (res.error) toast.error(res.error); setLeads(res.data); setCount(res.count) })
       .finally(() => alive && setLoading(false))
     return () => { alive = false }
-  }, [filters, page])
+  }, [filters, page, reloadKey])
 
   const pages = Math.max(1, Math.ceil(count / PAGE_SIZE))
   const statusOf = (key?: string | null) => options.statuses.find((s) => s.key === (key || 'new'))
@@ -95,6 +100,35 @@ export default function BulkSenderClient({
     if (channel === 'sms' && !SMS_ENABLED) return void toast.info(SMS_DISABLED_MESSAGE)
     setComposer({ leads: list, channel })
   }
+  const confirmDelete = async () => {
+    if (!deleteTargets || deleting) return
+    setDeleting(true)
+    try {
+      const res = await deleteBulkLeads(deleteTargets.map((l) => l.id))
+      if (!res.success) { toast.error(res.error || 'Could not delete'); return }
+      const gone = new Set(deleteTargets.map((l) => l.id))
+      setSelected((prev) => { const m = new Map(prev); gone.forEach((id) => m.delete(id)); return m })
+      const newCount = Math.max(0, count - res.deleted)
+      setCount(newCount)
+      setPage((p) => Math.min(p, Math.max(1, Math.ceil(newCount / PAGE_SIZE))))
+      setLeads((prev) => prev.filter((l) => !gone.has(l.id)))
+      setReloadKey((k) => k + 1) // reload the page so the list and total stay exact
+      setDeleteTargets(null)
+      toast.success(res.deleted === 1 ? 'Lead deleted' : `${res.deleted} leads deleted`)
+      if (res.deleted < deleteTargets.length) toast.info(`${deleteTargets.length - res.deleted} of the selected leads were already gone.`)
+    } catch {
+      toast.error('Could not delete the leads. Please try again.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+  useEffect(() => {
+    if (!deleteTargets) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !deleting) setDeleteTargets(null) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [deleteTargets, deleting])
+
   const sendBtn = 'inline-flex min-h-[40px] items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed'
   const iconBtn = 'inline-flex h-9 w-9 items-center justify-center rounded-lg border transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed'
   const select = 'min-h-[44px] w-full appearance-none rounded-lg border border-[#e8ecf2] bg-white pl-3 pr-9 text-sm text-[#0f1d33] outline-none focus:border-[#1e3a5f] cursor-pointer'
@@ -115,6 +149,12 @@ export default function BulkSenderClient({
         className={labelled ? `${sendBtn} border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100` : `${iconBtn} border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white`}>
         <Mail className="h-4 w-4" />{labelled && 'Email'}
       </button>
+      {canDelete && (
+        <button type="button" onClick={() => setDeleteTargets([l])} title="Delete this lead" aria-label={`Delete ${l.name || 'lead'}`}
+          className={labelled ? `${sendBtn} border border-red-200 bg-red-50 text-red-700 hover:bg-red-100` : `${iconBtn} border-red-200 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white`}>
+          <Trash2 className="h-4 w-4" />{labelled && 'Delete'}
+        </button>
+      )}
     </>
   )
 
@@ -175,10 +215,13 @@ export default function BulkSenderClient({
             )}
             {selected.size > 0 && <button type="button" onClick={() => setSelected(new Map())} className="min-h-[32px] font-semibold text-[#5a6a82] hover:text-[#0f1d33] cursor-pointer">Clear</button>}
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:flex">
+          <div className={`grid gap-2 sm:flex ${canDelete ? 'grid-cols-2' : 'grid-cols-3'}`}>
             <button type="button" disabled={!selected.size} onClick={() => open(selectedList, 'email')} className={`${sendBtn} justify-center bg-indigo-600 text-white hover:bg-indigo-700`}><Mail className="h-4 w-4" /> Email</button>
             <button type="button" disabled={SMS_ENABLED && !selected.size} onClick={() => open(selectedList, 'sms')} title={SMS_ENABLED ? undefined : SMS_DISABLED_MESSAGE} aria-disabled={!SMS_ENABLED || undefined} className={`${sendBtn} justify-center ${SMS_ENABLED ? 'bg-sky-600 text-white hover:bg-sky-700' : 'border border-[#e8ecf2] bg-[#f3f5f8] text-[#8a99ad]'}`}><Smartphone className="h-4 w-4" /> SMS</button>
             <button type="button" disabled={!selected.size} onClick={() => open(selectedList, 'whatsapp')} className={`${sendBtn} justify-center bg-[#1ea952] text-white hover:bg-[#178a43]`}><WhatsAppGlyph className="h-4 w-4" /> WhatsApp</button>
+            {canDelete && (
+              <button type="button" disabled={!selected.size} onClick={() => setDeleteTargets(selectedList)} className={`${sendBtn} justify-center border border-red-200 bg-white text-red-700 hover:bg-red-50`}><Trash2 className="h-4 w-4" /> Delete</button>
+            )}
           </div>
         </div>
       )}
@@ -201,7 +244,7 @@ export default function BulkSenderClient({
               <th className="w-[24%] px-3 py-3">Contact</th>
               <th className="w-[120px] px-3 py-3">Source</th>
               <th className="w-[140px] px-3 py-3">Status</th>
-              {canSend && <th className="w-[148px] px-3 py-3 text-right">Actions</th>}
+              {canSend && <th className={`${canDelete ? 'w-[196px]' : 'w-[148px]'} px-3 py-3 text-right`}>Actions</th>}
             </tr>
           </thead>
           <tbody className="divide-y divide-[#e8ecf2]">
@@ -276,6 +319,35 @@ export default function BulkSenderClient({
           <button type="button" onClick={() => setPage((p) => Math.min(pages, p + 1))} disabled={page >= pages || loading} className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#e8ecf2] bg-white disabled:opacity-40 cursor-pointer" aria-label="Next page"><ChevronRight className="h-4 w-4" /></button>
         </div>
       </div>
+      {deleteTargets && (
+        <div role="dialog" aria-modal="true" aria-labelledby="bulk-delete-title" className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f1d33]/50 p-4"
+          onClick={(e) => { if (e.target === e.currentTarget && !deleting) setDeleteTargets(null) }}>
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+            <div className="flex items-start gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600"><Trash2 className="h-5 w-5" /></span>
+              <div className="min-w-0">
+                <h2 id="bulk-delete-title" className="text-lg font-bold text-[#0f1d33]">Delete {deleteTargets.length === 1 ? 'this lead' : `${deleteTargets.length} leads`}?</h2>
+                <p className="mt-1 text-sm text-[#5a6a82]">This permanently removes {deleteTargets.length === 1 ? 'the lead' : 'these leads'} and their history (messages, emails, follow-ups) from the CRM. It can&apos;t be undone.</p>
+              </div>
+            </div>
+            <ul className="mt-3 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-[#e8ecf2] bg-[#f8fafc] p-2 text-sm">
+              {deleteTargets.slice(0, 8).map((l) => (
+                <li key={l.id} className="flex items-center justify-between gap-2">
+                  <span className="truncate font-semibold text-[#0f1d33]">{l.name || '-'}</span>
+                  <span className="shrink-0 text-xs text-[#5a6a82]">{l.phone || l.email || ''}</span>
+                </li>
+              ))}
+              {deleteTargets.length > 8 && <li className="text-xs text-[#5a6a82]">and {deleteTargets.length - 8} more</li>}
+            </ul>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => setDeleteTargets(null)} disabled={deleting} className="min-h-[44px] rounded-lg border border-[#e8ecf2] bg-white text-sm font-semibold text-[#0f1d33] hover:bg-[#f3f5f8] cursor-pointer disabled:opacity-60">Cancel</button>
+              <button type="button" onClick={confirmDelete} disabled={deleting} className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-lg bg-red-600 text-sm font-semibold text-white hover:bg-red-700 cursor-pointer disabled:opacity-60">
+                {deleting && <Loader2 className="h-4 w-4 animate-spin" />} Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

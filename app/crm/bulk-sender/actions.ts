@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { checkActionAccess } from '@/lib/auth/permissions'
 import { FALLBACK_SOURCE_KEYS } from '@/lib/lead-source'
@@ -58,6 +59,27 @@ export async function getBulkSenderOptions(): Promise<{
     statuses: statuses || [],
     sources: sources && sources.length ? sources : FALLBACK_SOURCE_KEYS.map((k) => ({ key: k, name: k.charAt(0).toUpperCase() + k.slice(1) })),
   }
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * Deletes leads from the Bulk Sender (and their history: activities are removed with them).
+ * Same rule as the Leads page: Super Admin only. Up to OUTREACH_MAX_LEADS at a time.
+ */
+export async function deleteBulkLeads(ids: string[]): Promise<{ success: boolean; deleted: number; error?: string }> {
+  const auth = await checkActionAccess('bulk_sender', 'edit')
+  if (!auth.authorized) return { success: false, deleted: 0, error: auth.error }
+  if (auth.role !== 'Super Admin') return { success: false, deleted: 0, error: 'Only the Super Admin can delete leads.' }
+
+  const list = [...new Set((Array.isArray(ids) ? ids : []).map(String).filter((id) => UUID_RE.test(id)))]
+  if (list.length === 0) return { success: false, deleted: 0, error: 'Choose at least one lead to delete.' }
+  if (list.length > OUTREACH_MAX_LEADS) return { success: false, deleted: 0, error: `You can delete up to ${OUTREACH_MAX_LEADS} leads at a time.` }
+
+  const { data, error } = await createServiceClient().from('leads').delete().in('id', list).select('id')
+  if (error) return { success: false, deleted: 0, error: error.message }
+  for (const path of ['/crm/bulk-sender', '/crm/leads', '/crm/inbox', '/crm']) revalidatePath(path)
+  return { success: true, deleted: (data || []).length }
 }
 
 /** One page of leads, latest enquiry first. */

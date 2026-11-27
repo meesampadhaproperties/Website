@@ -13,7 +13,7 @@ export const metadata = {
 
 export default async function BulkSenderPage() {
   await requireAccess('bulk_sender')
-  const { permissions } = await getCachedAuthSession()
+  const { permissions, role } = await getCachedAuthSession()
   const [options, first] = await Promise.all([getBulkSenderOptions(), getBulkLeads({}, 1, 50)])
   return (
     <BulkSenderClient
@@ -21,6 +21,7 @@ export default async function BulkSenderPage() {
       initialLeads={first.data}
       initialCount={first.count}
       canSend={permissions['bulk_sender'] === 'edit'}
+      canDelete={permissions['bulk_sender'] === 'edit' && role === 'Super Admin'}
     />
   )
 }

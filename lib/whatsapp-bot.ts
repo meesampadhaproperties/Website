@@ -23,7 +23,11 @@ const siteUrl = () => getConfiguredSiteUrl() || 'https://meesampadha.com'
 
 // ---------------------------------------------------------------- sending
 
-async function send(to: string, payload: Record<string, unknown>): Promise<boolean> {
+export function whatsappCredentialsConfigured(): boolean {
+  return !!process.env.WHATSAPP_ACCESS_TOKEN && !!process.env.WHATSAPP_PHONE_NUMBER_ID
+}
+
+async function sendRaw(to: string, payload: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch(`${META_GRAPH_BASE_URL}/${encodeURIComponent(process.env.WHATSAPP_PHONE_NUMBER_ID as string)}/messages`, {
       method: 'POST',
@@ -32,15 +36,24 @@ async function send(to: string, payload: Record<string, unknown>): Promise<boole
     })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      console.error('[WhatsApp bot] send failed:', res.status, data?.error?.message || '')
-      return false
+      const reason = String(data?.error?.message || `WhatsApp error ${res.status}`)
+      console.error('[WhatsApp bot] send failed:', res.status, reason)
+      return { ok: false, error: reason }
     }
-    return true
+    return { ok: true }
   } catch (e) {
-    console.error('[WhatsApp bot] send error:', e instanceof Error ? e.message : e)
-    return false
+    const reason = e instanceof Error ? e.message : 'Could not reach WhatsApp'
+    console.error('[WhatsApp bot] send error:', reason)
+    return { ok: false, error: reason }
   }
 }
+
+async function send(to: string, payload: Record<string, unknown>): Promise<boolean> {
+  return (await sendRaw(to, payload)).ok
+}
+
+/** A plain text message (used by the Bulk Sender). Only works inside the 24-hour window; WhatsApp refuses it otherwise. */
+export const sendWhatsAppText = (to: string, body: string) => sendRaw(to, { type: 'text', text: { body: body.slice(0, 4000), preview_url: false } })
 
 const sendText = (to: string, body: string) => send(to, { type: 'text', text: { body: body.slice(0, 4000), preview_url: false } })
 

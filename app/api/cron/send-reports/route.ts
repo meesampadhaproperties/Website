@@ -1,19 +1,23 @@
 import { NextResponse } from 'next/server'
 import { checkCronAuth } from '@/lib/cron-auth'
 import { createServiceClient } from '@/lib/supabase/server'
-import { normalizeWaReportTimings } from '@/lib/phone-input'
+import { masterTimesFor, normalizeReportTimes } from '@/lib/reports/slots'
 import {
-  REPORT_SLOTS, DEFAULT_REPORT_TIMES, currentIstSlot, istToUtc, windowStartFor,
-  buildLeadReport, sendReportEmail, sendReportWhatsApp, type LeadReportData,
+  REPORT_SLOTS, DEFAULT_REPORT_TIMES, currentIstSlot, windowForSlot,
+  buildLeadReport, sendReportEmail, sendReportWhatsApp, reportFileNames, type LeadReportData, type ReportFile,
 } from '@/lib/reports/lead-report'
+import { buildReportWorkbook } from '@/lib/reports/report-excel'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 /**
- * Scheduled lead reports. Call EVERY HOUR at minute 0 (IST) from an external cron (cron-job.org):
+ * Scheduled lead reports, at six fixed times (IST): 6 AM, 9 AM, 12 PM, 3 PM, 6 PM, 9 PM.
+ * Each report covers the time since the previous slot (6 AM covers yesterday 9 PM to 6 AM).
+ * A recipient can also get the MASTER report (every lead from the start) at the slots they tick.
+ *
+ * Call from an external cron (cron-job.org) at those six times, or every hour (other hours do nothing):
  *   GET /api/cron/send-reports   with header   Authorization: Bearer <CRON_SECRET>
- * Sends to every email/WhatsApp recipient whose selected times include the current IST hour.
  * Idempotent: report_dispatch_log has UNIQUE(channel, recipient, slot), so retries never double-send.
  */
 
@@ -25,25 +29,29 @@ export async function GET(request: Request) {
   if (!cronAuth.ok) return NextResponse.json({ error: cronAuth.error }, { status: cronAuth.status })
 
   const { date, slot } = currentIstSlot()
-  if (!REPORT_SLOTS.includes(slot)) {
+  if (!(REPORT_SLOTS as readonly string[]).includes(slot)) {
     return NextResponse.json({ status: 'skipped', reason: `No report slot at ${slot} IST`, slot })
   }
 
   const db = createServiceClient()
-  const slotEnd = istToUtc(date, slot)
+  const { start, end } = windowForSlot(date, slot)
   const slotKey = `${date}T${slot}`
 
   const [{ data: emails }, { data: phones }] = await Promise.all([
-    db.from('report_recipients').select('id, email, report_times'),
-    db.from('whatsapp_report_recipients').select('id, phone, report_times'),
+    db.from('report_recipients').select('id, email, report_times, master_times'),
+    db.from('whatsapp_report_recipients').select('id, phone, report_times, master_times'),
   ])
 
-  const jobs: { channel: 'email' | 'whatsapp'; id: string; to: string; times: string[] }[] = [
-    ...(emails || []).map((r: any) => ({ channel: 'email' as const, id: r.id, to: r.email, times: r.report_times?.length ? r.report_times : DEFAULT_REPORT_TIMES })),
-    ...(phones || []).map((r: any) => ({ channel: 'whatsapp' as const, id: r.id, to: r.phone, times: normalizeWaReportTimings(r.report_times) })),
+  const timesOf = (raw: unknown) => { const t = normalizeReportTimes(raw); return t.length ? t : DEFAULT_REPORT_TIMES }
+  const jobs = [
+    ...(emails || []).map((r: any) => ({ channel: 'email' as const, id: r.id as string, to: r.email as string, times: timesOf(r.report_times), master: masterTimesFor(timesOf(r.report_times), r.master_times) })),
+    ...(phones || []).map((r: any) => ({ channel: 'whatsapp' as const, id: r.id as string, to: r.phone as string, times: timesOf(r.report_times), master: masterTimesFor(timesOf(r.report_times), r.master_times) })),
   ].filter(j => j.times.includes(slot))
 
-  const reportCache = new Map<number, LeadReportData>() // one build per distinct window
+  // Built once for everybody: the report numbers and the Excel files
+  let report: LeadReportData | null = null
+  let reportFile: ReportFile | null = null
+  let masterFile: ReportFile | null = null
   const results: { channel: string; to: string; status: string; error?: string }[] = []
 
   for (const job of jobs) {
@@ -54,12 +62,18 @@ export async function GET(request: Request) {
     if (claimErr || !claimed) { results.push({ channel: job.channel, to: mask(job.to), status: 'already_sent' }); continue }
 
     try {
-      const start = windowStartFor(job.times, date, slot)
-      let report = reportCache.get(start.getTime())
-      if (!report) { report = await buildLeadReport(db, start, slotEnd); reportCache.set(start.getTime(), report) }
+      if (!report) report = await buildLeadReport(db, start, end)
+      const withMaster = job.master.includes(slot)
 
-      if (job.channel === 'email') await sendReportEmail(job.to, report)
-      else await sendReportWhatsApp(job.to, report)
+      if (job.channel === 'email') {
+        const names = reportFileNames(report)
+        if (!reportFile) reportFile = { filename: names.report, content: await buildReportWorkbook(db, start, end) }
+        // The master report (every lead so far) can be large: only built when someone ticked it for this slot
+        if (withMaster && !masterFile) masterFile = { filename: names.master, content: await buildReportWorkbook(db, start, end, true) }
+        await sendReportEmail(job.to, report, false, withMaster && masterFile ? [reportFile, masterFile] : [reportFile])
+      } else {
+        await sendReportWhatsApp(job.to, report, withMaster)
+      }
 
       await db.from('report_dispatch_log').update({ status: 'sent' }).eq('id', claimed.id)
       results.push({ channel: job.channel, to: mask(job.to), status: 'sent' })

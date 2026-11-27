@@ -20,7 +20,8 @@ import {
   LeadStatus,
   LeadSource
 } from './actions'
-import { extractTenDigitWaPhone, normalizeWaRecipientPhone, normalizeWaReportTimings } from '@/lib/phone-input'
+import { extractTenDigitWaPhone, normalizeWaRecipientPhone } from '@/lib/phone-input'
+import { DEFAULT_REPORT_TIMES, masterTimesFor, normalizeReportTimes } from '@/lib/reports/slots'
 
 import AutomatedReportsEmail from './components/AutomatedReportsEmail'
 import WhatsAppReports from './components/WhatsAppReports'
@@ -63,6 +64,7 @@ export default function ModulesClient({ initialRecipients, initialWaRecipients, 
   const [editEmailName, setEditEmailName] = useState('')
   const [editEmailAddress, setEditEmailAddress] = useState('')
   const [editEmailTimings, setEditEmailTimings] = useState<string[]>([])
+  const [editEmailMaster, setEditEmailMaster] = useState<string[]>([])
   const [isSavingEmailEdit, setIsSavingEmailEdit] = useState(false)
 
   // Inline Test Trigger States
@@ -79,6 +81,7 @@ export default function ModulesClient({ initialRecipients, initialWaRecipients, 
   const [editWaName, setEditWaName] = useState('')
   const [editWaPhone, setEditWaPhone] = useState('')
   const [editWaTimings, setEditWaTimings] = useState<string[]>([])
+  const [editWaMaster, setEditWaMaster] = useState<string[]>([])
   const [isSavingWaEdit, setIsSavingWaEdit] = useState(false)
   const [isRefreshingWa, setIsRefreshingWa] = useState(false)
 
@@ -176,7 +179,9 @@ export default function ModulesClient({ initialRecipients, initialWaRecipients, 
     setEditingEmailId(r.id)
     setEditEmailName(r.name || '')
     setEditEmailAddress(r.email)
-    setEditEmailTimings(r.report_times || [])
+    const t = normalizeReportTimes(r.report_times)
+    setEditEmailTimings(t.length ? t : DEFAULT_REPORT_TIMES)
+    setEditEmailMaster(masterTimesFor(t.length ? t : DEFAULT_REPORT_TIMES, r.master_times))
   }
 
   const handleSaveEmailEdit = async (id: string) => {
@@ -190,7 +195,8 @@ export default function ModulesClient({ initialRecipients, initialWaRecipients, 
       const res = await updateReportRecipient(id, {
         name: trimmedName,
         email: trimmedEmail || undefined,
-        report_times: editEmailTimings
+        report_times: editEmailTimings,
+        master_times: editEmailMaster
       })
 
       if (res.success) {
@@ -199,7 +205,8 @@ export default function ModulesClient({ initialRecipients, initialWaRecipients, 
           ...r,
           name: trimmedName,
           email: trimmedEmail || r.email,
-          report_times: editEmailTimings
+          report_times: normalizeReportTimes(editEmailTimings),
+          master_times: masterTimesFor(editEmailTimings, editEmailMaster)
         } : r))
         setEditingEmailId(null)
       } else {
@@ -270,7 +277,9 @@ export default function ModulesClient({ initialRecipients, initialWaRecipients, 
     setEditWaName(r.name || '')
     const cleanPhone = extractTenDigitWaPhone(r.phone_number)
     setEditWaPhone(cleanPhone)
-    setEditWaTimings(normalizeWaReportTimings(r.report_times))
+    const wt = normalizeReportTimes(r.report_times)
+    setEditWaTimings(wt.length ? wt : DEFAULT_REPORT_TIMES)
+    setEditWaMaster(masterTimesFor(wt.length ? wt : DEFAULT_REPORT_TIMES, r.master_times))
   }
 
   const handleSaveWaEdit = async (id: string) => {
@@ -286,12 +295,13 @@ export default function ModulesClient({ initialRecipients, initialWaRecipients, 
     setIsSavingWaEdit(true)
     try {
       const trimmedName = editWaName.trim() || null
-      const normalizedTimings = normalizeWaReportTimings(editWaTimings)
+      const normalizedTimings = normalizeReportTimes(editWaTimings)
 
       const res = await updateWaRecipient(id, {
         name: trimmedName,
         phone_number: clean.phone,
-        report_times: normalizedTimings
+        report_times: normalizedTimings,
+        master_times: editWaMaster
       })
 
       if (res.success && res.data) {
@@ -447,6 +457,8 @@ export default function ModulesClient({ initialRecipients, initialWaRecipients, 
             setEditEmailAddress={setEditEmailAddress}
             editEmailTimings={editEmailTimings}
             setEditEmailTimings={setEditEmailTimings}
+            editEmailMaster={editEmailMaster}
+            setEditEmailMaster={setEditEmailMaster}
             isSavingEmailEdit={isSavingEmailEdit}
             onStartEditEmail={handleStartEditEmail}
             onSaveEmailEdit={handleSaveEmailEdit}
@@ -490,6 +502,8 @@ export default function ModulesClient({ initialRecipients, initialWaRecipients, 
             setEditWaPhone={setEditWaPhone}
             editWaTimings={editWaTimings}
             setEditWaTimings={setEditWaTimings}
+            editWaMaster={editWaMaster}
+            setEditWaMaster={setEditWaMaster}
             isSavingWaEdit={isSavingWaEdit}
             onStartEditWa={handleStartEditWa}
             onSaveWaEdit={handleSaveWaEdit}
