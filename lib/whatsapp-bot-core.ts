@@ -13,6 +13,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export const PROJECTS_PER_PAGE = 9 // a WhatsApp list holds 10 rows: 9 projects + one "More projects" row
 export const MAX_DOCUMENTS = 5
 
+/** Message types the bot does not answer. */
+export const IGNORED_TYPES = new Set(['reaction', 'system', 'unsupported', 'ephemeral', 'revoked'])
+
 export interface WaIncoming {
   id: string
   /** Sender's number, digits with country code (e.g. 918977036622) */
@@ -46,6 +49,8 @@ export function parseIncoming(body: any): WaIncoming[] {
         const id = String(m?.id || '')
         const from = String(m?.from || '').replace(/\D/g, '')
         if (!id || !from) continue
+        // A reaction (emoji on a message) or a system notice is not a request: don't answer it with the menu
+        if (IGNORED_TYPES.has(String(m?.type || ''))) continue
         const reply = m?.interactive?.button_reply || m?.interactive?.list_reply
         out.push({
           id, from,

@@ -12,6 +12,7 @@ import { FOLLOW_UP_ACTIVITY, activityLabel, validateFollowUp, type FollowUpInput
 import { FALLBACK_SOURCE_KEYS, resolveLeadSource } from '@/lib/lead-source'
 import { findLeadsByPhone, phoneMatchKey } from '@/lib/lead-phone'
 import { loadEnquiryTypes } from '@/lib/enquiry-types'
+import { WHATSAPP_ACTIVITY_TYPES } from '@/lib/whatsapp-activity'
 import {
   ENQUIRY_ACTIVITY_TYPES, mergeEnquiryProjects, resolveEnquiryType, resolveProjectChoice, type ProjectOption,
 } from '@/lib/lead-fields'
@@ -123,7 +124,16 @@ export async function getLeads(
     return { data: [], count: 0 }
   }
 
-  return { data, count: count || 0 }
+  // Which of these leads have chatted with the WhatsApp bot (whatever their source): they get the "WhatsApp Activity" button
+  const ids = (data || []).map((l: any) => l.id)
+  let chatted = new Set<string>()
+  if (ids.length > 0) {
+    const { data: acts } = await supabase.from('lead_activities').select('lead_id')
+      .in('lead_id', ids).in('activity_type', WHATSAPP_ACTIVITY_TYPES as unknown as string[]).limit(10000)
+    chatted = new Set(((acts || []) as any[]).map((a) => a.lead_id))
+  }
+
+  return { data: (data || []).map((l: any) => ({ ...l, has_whatsapp: chatted.has(l.id) })), count: count || 0 }
 }
 
 /** Result of saving a lead. `duplicate` = this phone number already belongs to a lead (nothing was saved). */

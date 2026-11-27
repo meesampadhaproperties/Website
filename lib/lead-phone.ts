@@ -35,9 +35,12 @@ export async function findLeadsByPhone(
 ): Promise<any[]> {
   const pattern = phoneCandidatePattern(phone)
   if (!pattern) return []
-  const { data, error } = await db.from('leads').select(columns).ilike('phone', pattern)
-    .order('created_at', { ascending: true }).limit(limit)
+  // The exact match below compares each row's phone, so it must always be read, whatever columns the caller asked for
+  const cols = columns.trim() === '*' || /(^|,)\s*phone\s*(,|$)/.test(columns) ? columns : `${columns}, phone`
+  // The loose pattern can also catch other numbers, so read enough candidates and apply `limit` after the exact match
+  const { data, error } = await db.from('leads').select(cols).ilike('phone', pattern)
+    .order('created_at', { ascending: true }).limit(Math.max(limit, 50))
   if (error || !data) return []
   const key = phoneMatchKey(phone)
-  return data.filter((l: any) => phoneMatchKey(l.phone) === key)
+  return data.filter((l: any) => phoneMatchKey(l.phone) === key).slice(0, limit)
 }

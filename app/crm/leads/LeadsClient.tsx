@@ -22,69 +22,14 @@ import { getEnquiryTypeOptions } from '../modules/enquiry-type-actions'
 import { EnquiryBadge, EnquiryHistoryDialog } from '@/components/EnquiryHistory'
 import LeadProjectChips from '@/components/LeadProjectChips'
 import { FormProjectSelect } from '@/components/FormProjectSelect'
+import { whatsappBubble } from '@/lib/whatsapp-activity'
 import { 
   getIstCurrentDateString, 
   getIstYesterdayDateString, 
   getIstDaysAgoDateString 
 } from '@/lib/timezone'
 
-const extractIncomingMessage = (details: string) => {
-  if (!details) return '(no text content)';
-  
-  const lines = details.split('\n');
-  const msgLine = lines.find(l => l.startsWith('Message: '));
-  
-  if (msgLine) {
-    let msg = msgLine.replace('Message: ', '').trim();
-    if (msg.startsWith('"') && msg.endsWith('"')) {
-      msg = msg.slice(1, -1);
-    }
-    if (msg && msg !== '(no text content)') {
-      return msg;
-    }
-  }
 
-  // Fallback for historical/interactive/ad records where Message was logged as '(no text content)'
-  const selectionLine = lines.find(l => l.startsWith('Selection: '));
-  if (selectionLine) {
-    const rawSelection = selectionLine.replace('Selection: ', '').trim();
-    const cleaned = rawSelection.replace(/^(area_|proj_|action_)/, '').replace(/_/g, ' ');
-    if (cleaned) return `Selected: ${cleaned}`;
-  }
-
-  const referralTypeLine = lines.find(l => l.startsWith('WhatsApp referral source type: '));
-  const ctwaLine = lines.find(l => l.startsWith('Click-to-WhatsApp ID: '));
-  if (referralTypeLine || ctwaLine) {
-    return 'Ad Interaction (Click-to-WhatsApp)';
-  }
-
-  const typeLine = lines.find(l => l.startsWith('Type: '));
-  if (typeLine) {
-    const typeVal = typeLine.replace('Type: ', '').trim().toLowerCase();
-    if (typeVal === 'unsupported') {
-      const isReferral = lines.some(l => l.includes('referral') || l.includes('Click-to-WhatsApp'));
-      return isReferral ? 'Ad Interaction (Click-to-WhatsApp)' : 'Chat Initiated (Ad CTA / Interactive Button)';
-    }
-    if (typeVal && typeVal !== 'text') {
-      return `[${typeVal.charAt(0).toUpperCase() + typeVal.slice(1)} message]`;
-    }
-  }
-
-  return msgLine ? '(no text content)' : details.trim() || '(no text content)';
-};
-
-const extractMediaInfo = (details: string) => {
-  if (!details) return null;
-  const lines = details.split('\n');
-  const mediaLine = lines.find(l => l.startsWith('Media ID: '));
-  const typeLine = lines.find(l => l.startsWith('Type: '));
-  const mimeLine = lines.find(l => l.startsWith('MIME: '));
-  if (!mediaLine) return null;
-  const mediaId = mediaLine.replace('Media ID: ', '').trim();
-  const type = typeLine ? typeLine.replace('Type: ', '').trim().toLowerCase() : '';
-  const mime = mimeLine ? mimeLine.replace('MIME: ', '').trim().toLowerCase() : '';
-  return { mediaId, type, mime };
-};
 
 const FacebookIcon = (props: any) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
@@ -104,8 +49,8 @@ const WhatsAppIcon = (props: React.SVGProps<SVGSVGElement>) => (
   </svg>
 )
 
-/** WhatsApp chat history is only shown for leads whose source is WhatsApp. */
-const isWhatsAppSource = (lead: any) => String(lead?.source_page || '').toLowerCase().includes('whatsapp')
+/** The WhatsApp chat history button: leads whose source is WhatsApp, and any other lead who has chatted with the bot. */
+const isWhatsAppSource = (lead: any) => String(lead?.source_page || '').toLowerCase().includes('whatsapp') || lead?.has_whatsapp === true
 
 const isMetaLead = (lead: any): boolean => {
   if (!lead) return false;
@@ -2208,81 +2153,30 @@ export default function LeadsClient({
                 </div>
               ) : (
                 whatsappActivities.map((activity, idx) => {
-                  const type = activity.activity_type.toLowerCase();
-                  const time = new Date(activity.created_at).toLocaleString('en-IN', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit', hour12: true });
-                  
-                  if (type.includes('incoming whatsapp')) {
-                    const msg = extractIncomingMessage(activity.details);
-                    const media = extractMediaInfo(activity.details);
+                  const time = new Date(activity.created_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true });
+                  const bubble = whatsappBubble(activity);
+
+                  // Customer on the left (white), the business bot on the right (green), like the WhatsApp Business app
+                  if (bubble.side === 'customer' || bubble.side === 'bot') {
+                    const mine = bubble.side === 'bot';
                     return (
-                      <div key={idx} className="flex flex-col items-end self-end max-w-[85%] mt-1">
-                        <div className="bg-[#d9fdd3] text-[#111b21] px-3 pt-2 pb-1.5 rounded-lg rounded-tr-none shadow-sm relative text-sm border border-[#c3e8bd]">
-                           <span className="font-bold text-[#025c4c] text-[11px] leading-tight block mb-0.5">{whatsappLead.name || 'User'}</span>
-                           <div className="whitespace-pre-wrap leading-snug">{msg}</div>
-                           {media && (
-                             <div className="mt-2 rounded-lg overflow-hidden border border-[#c3e8bd]/60 bg-black/5">
-                               {media.type === 'video' || media.mime.startsWith('video/') ? (
-                                 <video
-                                   controls
-                                   playsInline
-                                   className="rounded-lg max-w-full max-h-60 bg-black"
-                                   src={`/api/whatsapp/media/${media.mediaId}`}
-                                 />
-                               ) : media.type === 'image' || media.mime.startsWith('image/') ? (
-                                 <img
-                                   src={`/api/whatsapp/media/${media.mediaId}`}
-                                   alt="Attachment"
-                                   className="rounded-lg max-w-full max-h-60 object-cover cursor-pointer hover:opacity-95"
-                                   onClick={() => window.open(`/api/whatsapp/media/${media.mediaId}`, '_blank')}
-                                 />
-                               ) : media.type === 'audio' || media.mime.startsWith('audio/') ? (
-                                 <audio
-                                   controls
-                                   className="w-full max-w-xs mt-1"
-                                   src={`/api/whatsapp/media/${media.mediaId}`}
-                                 />
-                               ) : (
-                                 <a
-                                   href={`/api/whatsapp/media/${media.mediaId}`}
-                                   download
-                                   target="_blank"
-                                   rel="noopener noreferrer"
-                                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-xs font-semibold rounded-md border border-[#c3e8bd] text-[#025c4c] hover:bg-[#d9fdd3] transition-colors"
-                                 >
-                                   📎 Download Attachment
-                                 </a>
-                               )}
-                             </div>
-                           )}
-                           <div className="text-[10px] text-[#667781] text-right mt-1 -mb-0.5 ml-4 float-right">{time}</div>
+                      <div key={activity.id || idx} className={`flex flex-col max-w-[85%] mt-1 ${mine ? 'items-end self-end' : 'items-start self-start'}`}>
+                        <div className={`px-3 pt-2 pb-1.5 rounded-lg shadow-sm text-sm border text-[#111b21] ${mine ? 'bg-[#d9fdd3] border-[#c3e8bd] rounded-tr-none' : 'bg-white border-[#e8ecf2] rounded-tl-none'}`}>
+                          <span className={`block mb-0.5 text-[11px] font-bold leading-tight ${mine ? 'text-[#025c4c]' : 'text-[#1e3a5f]'}`}>
+                            {mine ? 'WhatsApp bot' : (whatsappLead.name || 'Customer')}
+                          </span>
+                          <div className="whitespace-pre-wrap break-words leading-snug">{bubble.text}</div>
+                          <div className="mt-1 text-right text-[10px] text-[#667781]">{time}</div>
                         </div>
                       </div>
                     );
                   }
-                  
-                  if (type.includes('outgoing whatsapp')) {
-                    return (
-                      <div key={idx} className="flex flex-col items-start self-start max-w-[85%] mt-1">
-                        <div className="bg-white text-[#111b21] px-3 pt-2 pb-1.5 rounded-lg rounded-tl-none shadow-sm relative text-sm border border-[#e8ecf2]">
-                           <span className="font-bold text-brand text-[11px] leading-tight block mb-0.5">CRM Bot</span>
-                           <div className="whitespace-pre-wrap leading-snug">{activity.details}</div>
-                           <div className="text-[10px] text-[#667781] text-right mt-1 -mb-0.5 ml-4 float-right">{time}</div>
-                        </div>
-                      </div>
-                    );
-                  }
-                  
-                  // System Chip
-                  let chipText = activity.activity_type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-                  if (type === 'bot started') chipText = 'Bot Started Conversation';
-                  else if (activity.details && !activity.details.includes('Provider timestamp')) {
-                    chipText = `${chipText}: ${activity.details}`;
-                  }
-                  
+
+                  // Anything else in the lead's history (enquiries, status changes, emails) is a small grey note
                   return (
-                    <div key={idx} className="flex justify-center my-2">
-                      <div className="bg-[#f3f5f8] text-[#5a6a82] px-3 py-1.5 rounded-full text-[11px] font-medium shadow-sm border border-[#e8ecf2]">
-                        {chipText} • {time}
+                    <div key={activity.id || idx} className="flex justify-center my-2">
+                      <div className="max-w-[90%] bg-[#f3f5f8] text-[#5a6a82] px-3 py-1.5 rounded-2xl text-[11px] font-medium shadow-sm border border-[#e8ecf2] text-center break-words">
+                        {bubble.text} • {time}
                       </div>
                     </div>
                   );

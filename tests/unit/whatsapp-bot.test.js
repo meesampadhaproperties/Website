@@ -56,3 +56,12 @@ test('project text and file names are tidy', () => {
   assert.strictEqual(documentFileName('../../evil/<name>', null), 'evilname.pdf');
   assert.strictEqual(clip('abcdefghij', 5), 'abcd…');
 });
+
+test('reactions and system notices get no reply', () => {
+  const msgs = parseIncoming(payload([
+    { id: 'r1', from: '918977036622', type: 'reaction', reaction: { emoji: '👍' } },
+    { id: 's1', from: '918977036622', type: 'system', system: { body: 'changed number' } },
+    { id: 'i1', from: '918977036622', type: 'image', image: { id: 'm' } },
+  ]));
+  assert.deepStrictEqual(msgs.map((m) => m.id), ['i1']); // a photo still gets the menu
+});

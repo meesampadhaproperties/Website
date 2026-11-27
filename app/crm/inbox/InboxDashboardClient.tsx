@@ -1667,7 +1667,8 @@ export default function InboxDashboardClient({
                           minute: '2-digit',
                           hour12: true
                         });
-                        const isIncoming = (act.activity_type || '').toLowerCase().includes('incoming whatsapp');
+                        const actType = (act.activity_type || '').toLowerCase();
+                        const isIncoming = actType.includes('incoming whatsapp') || actType === 'whatsapp_in';
 
                         return (
                           <div
