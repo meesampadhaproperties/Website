@@ -73,7 +73,7 @@ const sendDocument = (to: string, link: string, filename: string, caption: strin
 const MENU_BUTTONS = [{ id: 'explore', title: 'Explore projects' }, { id: 'contact', title: 'Contact us' }]
 
 async function replyWelcome(to: string) {
-  await sendButtons(to, `Welcome to ${COMPANY_NAME}! 🏡\n\nI can show you our projects and send you their brochures and documents. What would you like to do?`, MENU_BUTTONS)
+  await sendButtons(to, `Welcome to ${COMPANY_NAME}! 🏡\n\nPlease select an option.`, MENU_BUTTONS)
 }
 
 async function replyContact(to: string) {
