@@ -1,7 +1,7 @@
 import { YouTubeEmbed } from '@/components/site/YouTubeEmbed'
 import type { PublicReview } from '@/lib/website-projects'
 
-/** Public /reviews: one card per YouTube review, a click-to-play preview with the title below it. */
+/** Public /knowledge-base: one card per video, a click-to-play preview with the title below it. */
 export function ReviewsList({ reviews }: { reviews: PublicReview[] }) {
   return (
     <div className="bg-[#f5f2ea]">

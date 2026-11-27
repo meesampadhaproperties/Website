@@ -11,7 +11,7 @@ import { AutoRefresh } from '@/components/site/AutoRefresh'
 
 export const metadata: Metadata = {
   title: 'Projects: Flats, Villas & Plots in Hyderabad | Mee Sampadha',
-  description: 'Browse Mee Sampadha projects in Hyderabad by property type: flats, villas, houses, open plots, farm lands and commercial plots. Ask for current availability.',
+  description: 'Browse Mee Sampadha projects in Hyderabad by property type: flats, villas, houses and open plots. Ask for current availability.',
   alternates: { canonical: '/projects' },
 }
 
@@ -35,7 +35,7 @@ export default async function ProjectsPage() {
           <p className="mt-5 max-w-2xl text-lg text-white/75">
             {hasProjects
               ? 'Plots, villas and flats across Hyderabad. Pick a location below, watch the project video and download the documents.'
-              : 'Flats, villas, houses, plots and farm lands across Hyderabad. Availability changes often, so ask us for the projects open right now in your budget and area.'}
+              : 'Flats, villas, houses and plots across Hyderabad. Availability changes often, so ask us for the projects open right now in your budget and area.'}
             {' '}New here? <Link href="/about" className="font-semibold text-site-gold underline underline-offset-4">Learn about Mee Sampadha</Link>.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">

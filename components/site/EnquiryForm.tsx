@@ -65,6 +65,14 @@ export function EnquiryForm({ onSuccess }: { onSuccess?: () => void }) {
       </div>
 
       <div>
+        <label htmlFor={`${uid}-email`} className={label}>Email <span className="font-normal text-white/60">(optional)</span></label>
+        <input id={`${uid}-email`} name="email" type="email" autoComplete="email" maxLength={120} placeholder="you@example.com"
+          defaultValue={state.values?.email} aria-invalid={!!e.email} aria-describedby={e.email ? `${uid}-email-err` : undefined}
+          className={`${field} h-11`} />
+        {e.email && <p id={`${uid}-email-err`} className={err}>{e.email}</p>}
+      </div>
+
+      <div>
         <label htmlFor={`${uid}-message`} className={label}>Message <span className="text-site-gold" aria-hidden>*</span></label>
         <textarea id={`${uid}-message`} name="message" required rows={3} maxLength={500} placeholder="What are you looking for? Budget, area, property type..."
           defaultValue={state.values?.message} aria-invalid={!!e.message} aria-describedby={e.message ? `${uid}-message-err` : undefined}

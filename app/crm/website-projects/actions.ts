@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { createServiceClient } from '@/lib/supabase/server'
 import { checkActionAccess } from '@/lib/auth/permissions'
 import { getStorageLimitBytes } from '@/lib/site-config'
-import { parseYouTubeId } from '@/lib/youtube'
+import { parseVideoKey } from '@/lib/video-link'
 import {
   WEBSITE_MEDIA_BUCKET, WEBSITE_MAX_POINTS, WEBSITE_POINT_MAX_CHARS, WEBSITE_MAX_DOWNLOADS,
   WEBSITE_TITLE_MAX_CHARS, WEBSITE_LOCATION_MAX_CHARS, WEBSITE_MAX_TAGS, WEBSITE_TAG_MAX_CHARS, WEBSITE_MAP_URL_MAX_CHARS, WEBSITE_MAX_VIDEO_BYTES, WEBSITE_VIDEO_MIME, isWebsiteDownloadable, websiteMediaUrl,
@@ -62,7 +62,7 @@ function revalidate() {
   revalidatePath('/crm/website-projects')
   revalidatePath('/projects')
   revalidatePath('/gallery')
-  revalidatePath('/reviews')
+  revalidatePath('/knowledge-base')
   revalidatePath('/')
 }
 
@@ -316,17 +316,17 @@ async function saveWebsiteProjectInner(db: any, userId: string, input: WebsitePr
   const { data: cat } = await db.from('website_project_categories').select('id').eq('id', input.categoryId).maybeSingle()
   if (!cat) return { success: false, error: 'That category no longer exists.' }
 
-  // YouTube link (instead of an uploaded video): store only the 11-character id
+  // Video link (instead of an uploaded video): a YouTube id, or the cleaned link for any other site
   let ytId: string | null | undefined
   if (input.youtubeUrl !== undefined) {
     const raw = String(input.youtubeUrl || '').trim()
     if (!raw) ytId = null
     else {
-      ytId = parseYouTubeId(raw)
-      if (!ytId) return { success: false, error: 'Enter a valid YouTube video link.' }
+      ytId = parseVideoKey(raw)
+      if (!ytId) return { success: false, error: 'Enter a valid video link (YouTube, Instagram, Facebook, Vimeo or any other).' }
     }
   }
-  if (ytId && input.video) return { success: false, error: 'Choose either an uploaded video or a YouTube link, not both.' }
+  if (ytId && input.video) return { success: false, error: 'Choose either an uploaded video or a video link, not both.' }
 
   // New video: it must already be uploaded, under our prefix
   const video = input.video || null
@@ -518,8 +518,8 @@ function cleanReview(title: unknown, url: unknown): { ok: boolean; error?: strin
   const t = clean(title, 1000)
   if (!t) return { ok: false, error: 'Review title is required.' }
   if (t.length > WEBSITE_REVIEW_TITLE_MAX_CHARS) return { ok: false, error: `Review title can be up to ${WEBSITE_REVIEW_TITLE_MAX_CHARS} characters.` }
-  const id = parseYouTubeId(String(url ?? ''))
-  if (!id) return { ok: false, error: 'Enter a valid YouTube video link (youtube.com/watch, youtu.be or Shorts).' }
+  const id = parseVideoKey(String(url ?? ''))
+  if (!id) return { ok: false, error: 'Enter a valid video link (YouTube, Instagram, Facebook, Vimeo or any other).' }
   return { ok: true, title: t, id }
 }
 
@@ -624,9 +624,9 @@ async function saveTestimonialInner(db: any, userId: string, input: WebsiteTesti
   let removeOld = false
 
   if (input.source === 'youtube') {
-    if (input.video) return { success: false, error: 'Choose either a YouTube link or an uploaded video, not both.' }
-    const id = parseYouTubeId(String(input.youtubeUrl || ''))
-    if (!id) return { success: false, error: 'Enter a valid YouTube video link.' }
+    if (input.video) return { success: false, error: 'Choose either a video link or an uploaded video, not both.' }
+    const id = parseVideoKey(String(input.youtubeUrl || ''))
+    if (!id) return { success: false, error: 'Enter a valid video link (YouTube, Instagram, Facebook, Vimeo or any other).' }
     Object.assign(fields, { youtube_id: id, video_path: null, video_mime: null, video_size_bytes: null })
     removeOld = !!existingPath // switching to YouTube frees the uploaded file
   } else if (input.source === 'video') {
@@ -646,7 +646,7 @@ async function saveTestimonialInner(db: any, userId: string, input: WebsiteTesti
       return { success: false, error: 'Choose an MP4 video to upload.' }
     }
   } else {
-    return { success: false, error: 'Choose a YouTube link or a video.' }
+    return { success: false, error: 'Choose a video link or an MP4.' }
   }
 
   const write = isEdit
@@ -725,15 +725,15 @@ export async function addWebsiteProjectVideos(projectId: string, items: ExtraVid
 
   if (list.length === 0) return { success: false, error: 'No videos to add.' }
   const rows: Record<string, any>[] = []
-  const seenYt = new Set<string>()
+  const seenYt = new Set<string>() // video keys (YouTube id or link) already seen in this request
   for (const i of list) {
     if (i.path) {
-      if (i.youtubeUrl) return fail('Each video is either a YouTube link or an MP4, not both.')
+      if (i.youtubeUrl) return fail('Each video is either a link or an MP4, not both.')
       if (!isOurProjectVideoPath(i.path, projectId) || String(i.mimeType || '').toLowerCase() !== WEBSITE_VIDEO_MIME || !/\.mp4$/i.test(i.path)) return fail('Only MP4 videos are allowed.')
       rows.push({ video_path: i.path, video_mime: WEBSITE_VIDEO_MIME, video_size_bytes: Number(i.sizeBytes) || null, youtube_id: null })
     } else {
-      const id = parseYouTubeId(String(i.youtubeUrl || ''))
-      if (!id) return fail('Enter a valid YouTube video link.')
+      const id = parseVideoKey(String(i.youtubeUrl || ''))
+      if (!id) return fail('Enter a valid video link (YouTube, Instagram, Facebook, Vimeo or any other).')
       if (seenYt.has(id)) continue // the same link twice in one go: keep one
       seenYt.add(id)
       rows.push({ youtube_id: id, video_path: null, video_mime: null, video_size_bytes: null })

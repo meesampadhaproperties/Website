@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { BadgeCheck, Building2, Compass, Eye, FileText, Handshake, HeartHandshake, House, KeyRound, LandPlot, ListChecks, MapPinned, Search, ShieldCheck, Store, Target, Trees } from 'lucide-react'
+import { BadgeCheck, Building2, Compass, Eye, FileText, Handshake, HeartHandshake, House, KeyRound, LandPlot, ListChecks, MapPinned, Search, ShieldCheck, Sofa, Landmark, Target } from 'lucide-react'
 import { SITE_CONTACT } from '@/lib/site-config'
 import { DreamPropertyCta } from '@/components/site/DreamPropertyCta'
 import { Reveal } from '@/components/site/Reveal'
@@ -9,7 +9,7 @@ import { AboutHeroArt } from '@/components/site/AboutHeroArt'
 
 export const metadata: Metadata = {
   title: 'About Mee Sampadha | Real Estate Agents in Hyderabad',
-  description: 'Mee Sampadha is a real estate agency in Kukatpally, Hyderabad. We help buyers find flats, villas, houses, plots and farm lands with honest, clear guidance.',
+  description: 'Mee Sampadha is a real estate agency in Gajularamaram, Hyderabad. We help buyers find flats, villas, houses and plots, and help with interiors and loans, with honest, clear guidance.',
   alternates: { canonical: '/about' },
 }
 
@@ -20,8 +20,8 @@ const deals = [
   { Icon: Building2, title: 'Flats and apartments', text: 'Ready-to-move and under-construction homes in gated communities and standalone buildings.' },
   { Icon: House, title: 'Villas and houses', text: 'Independent homes with space and privacy for a growing family.' },
   { Icon: LandPlot, title: 'Open plots', text: 'Residential plots in approved layouts to build on or hold as an investment.' },
-  { Icon: Trees, title: 'Farm lands', text: 'Agricultural land for farming, farm houses or a long-term holding.' },
-  { Icon: Store, title: 'Commercial plots', text: 'Land and sites suited to shops, offices and business use.' },
+  { Icon: Sofa, title: 'Interior', text: 'Design and finishing for your new home, so it is ready to live in.' },
+  { Icon: Landmark, title: 'Loan services', text: 'Help with home and plot loans, from choosing a lender to completing the paperwork.' },
 ]
 
 const services = [
@@ -56,7 +56,7 @@ export default function AboutPage() {
               {SITE_CONTACT.tagline}. A Hyderabad real estate agency helping families buy flats, villas, plots and land with honest guidance.
             </p>
             <dl className="rise-in mt-8 flex max-w-xl flex-wrap gap-x-10 gap-y-5 border-t-2 border-site-ink pt-6" style={{ '--d': '300ms' } as React.CSSProperties}>
-              <div><dt className="text-sm text-slate-600">Office</dt><dd className="mt-1 whitespace-nowrap font-display text-lg font-semibold text-site-ink">Kukatpally, Hyderabad</dd></div>
+              <div><dt className="text-sm text-slate-600">Office</dt><dd className="mt-1 whitespace-nowrap font-display text-lg font-semibold text-site-ink">Gajularamaram, Hyderabad</dd></div>
               <div><dt className="text-sm text-slate-600">We deal in</dt><dd className="mt-1 whitespace-nowrap font-display text-lg font-semibold text-site-ink">Flats, villas, plots and land</dd></div>
             </dl>
           </div>

@@ -1,3 +1,4 @@
+import { queueWelcomeEmail } from '@/lib/welcome-email-send'
 import { buildLabeledAnswers, formatMetaCustomFields, type MetaFormQuestion, type ParsedMetaLead } from '@/lib/meta'
 import { findLeadsByPhone } from '@/lib/lead-phone'
 import { mergeEnquiryProjects } from '@/lib/lead-fields'
@@ -142,5 +143,7 @@ export async function ingestMetaLead(db: any, p: IngestParams): Promise<{ outcom
     metadata,
     created_at: submittedAt,
   })
+  // Welcome email only for fresh leads: syncing old leads (historical sync, reconcile) must never email people who enquired weeks ago
+  if (Date.now() - new Date(submittedAt).getTime() < 24 * 60 * 60 * 1000) queueWelcomeEmail(inserted.id)
   return { outcome: 'inserted', leadId: inserted.id }
 }

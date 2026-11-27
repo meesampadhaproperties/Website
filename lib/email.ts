@@ -40,3 +40,18 @@ export async function sendEmails(emails: OutgoingEmail[]): Promise<{ ok: boolean
   }
   return results
 }
+
+/** One email with a reply-to (used for Careers applications). Returns an error text, or null when sent. */
+export async function sendOneEmail(m: { to: string; subject: string; html: string; text: string; replyTo?: string }): Promise<string | null> {
+  if (!emailConfigured()) return 'Email is not set up (RESEND_API_KEY / RESEND_FROM_EMAIL).'
+  try {
+    const { error } = await new Resend(process.env.RESEND_API_KEY).emails.send({
+      from: `${COMPANY_NAME} <${process.env.RESEND_FROM_EMAIL}>`,
+      to: m.to, subject: m.subject, html: m.html, text: m.text,
+      ...(m.replyTo ? { replyTo: m.replyTo } : {}),
+    })
+    return error ? (error.message || 'Resend rejected the email') : null
+  } catch (e: any) {
+    return e?.message || 'Could not reach Resend'
+  }
+}
