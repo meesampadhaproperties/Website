@@ -1,5 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server'
-import { COMPANY_NAME, META_GRAPH_BASE_URL, MAPS_LINK, SITE_CONTACT, getConfiguredSiteUrl } from '@/lib/site-config'
+import { COMPANY_NAME, META_GRAPH_BASE_URL, SITE_CONTACT, getConfiguredSiteUrl } from '@/lib/site-config'
 import { findLeadsByPhone } from '@/lib/lead-phone'
 import { canonicalPhoneNumber } from '@/lib/phone-input'
 import { mergeEnquiryProjects } from '@/lib/lead-fields'
@@ -78,14 +78,14 @@ async function replyWelcome(to: string) {
 
 async function replyContact(to: string) {
   const a = SITE_CONTACT.address
+  // A blank line between each item so it is easy to read on a phone
   await sendText(to, [
     `*${COMPANY_NAME}*`,
     `📞 ${SITE_CONTACT.phone}`,
     `✉️ ${SITE_CONTACT.emails[0]}`,
     `📍 ${a.lines.join(' ').replace(/,\s*$/, '')}`,
-    `Map: ${MAPS_LINK}`,
-    `Website: ${siteUrl()}`,
-  ].join('\n'))
+    `🌐 ${siteUrl()}`,
+  ].join('\n\n'))
   await sendButtons(to, 'Anything else?', [{ id: 'explore', title: 'Explore projects' }, { id: 'menu', title: 'Main menu' }])
 }
 
