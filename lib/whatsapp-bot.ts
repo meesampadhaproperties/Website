@@ -77,13 +77,11 @@ async function replyWelcome(to: string) {
 }
 
 async function replyContact(to: string) {
-  const a = SITE_CONTACT.address
   // A blank line between each item so it is easy to read on a phone
   await sendText(to, [
     `*${COMPANY_NAME}*`,
     `📞 ${SITE_CONTACT.phone}`,
     `✉️ ${SITE_CONTACT.emails[0]}`,
-    `📍 ${a.lines.join(' ').replace(/,\s*$/, '')}`,
     `🌐 ${siteUrl()}`,
   ].join('\n\n'))
   await sendButtons(to, 'Anything else?', [{ id: 'explore', title: 'Explore projects' }, { id: 'menu', title: 'Main menu' }])
