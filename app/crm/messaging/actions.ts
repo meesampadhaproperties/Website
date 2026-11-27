@@ -5,6 +5,9 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { checkActionAccess } from '@/lib/auth/permissions'
 import { emailConfigured, sendEmails } from '@/lib/email'
 import { OUTREACH_MAX_LEADS, isValidEmail, personalize, textToEmailHtml } from '@/lib/outreach'
+import { phoneMatchKey } from '@/lib/lead-phone'
+import { splitByWindow, windowStart } from '@/lib/whatsapp-window'
+import { sendWhatsAppText, whatsappCredentialsConfigured } from '@/lib/whatsapp-bot'
 import { SMS_ENABLED, SMS_DISABLED_MESSAGE, SMS_VALUE_MAX, fillTemplate, msg91Mobile, sendMsg91Sms, templateVariables } from '@/lib/sms'
 
 /**
@@ -39,11 +42,11 @@ export interface SendSummary {
 }
 
 /** What's set up on this deployment, for the composer. */
-export async function getMessagingSetup(): Promise<{ email: boolean; smsKey: boolean; smsTemplates: { id: string; name: string; body: string }[]; error?: string }> {
+export async function getMessagingSetup(): Promise<{ email: boolean; smsKey: boolean; waBot: boolean; smsTemplates: { id: string; name: string; body: string }[]; error?: string }> {
   const auth = await messagingAccess('view')
-  if (!auth.authorized) return { email: false, smsKey: false, smsTemplates: [], error: auth.error }
+  if (!auth.authorized) return { email: false, smsKey: false, waBot: false, smsTemplates: [], error: auth.error }
   const { data } = await createServiceClient().from('sms_templates').select('id, name, body').eq('is_active', true).order('name', { ascending: true })
-  return { email: emailConfigured(), smsKey: !!process.env.MSG91_AUTH_KEY, smsTemplates: data || [] }
+  return { email: emailConfigured(), smsKey: !!process.env.MSG91_AUTH_KEY, waBot: whatsappCredentialsConfigured(), smsTemplates: data || [] }
 }
 
 /** Custom email to one or many leads. {name}/{project} are filled per lead. */
@@ -183,4 +186,81 @@ export async function logOutreach(leadId: string, channel: 'whatsapp' | 'sms_pho
     created_at: new Date().toISOString(),
   })
   return error ? { success: false, error: error.message } : { success: true }
+}
+
+
+// ---------------------------------------------------------------- WhatsApp through the bot number (free inside the 24-hour window)
+
+export interface BotSendSummary extends SendSummary {
+  /** Not messaged: they have not written to the bot in the last 24 hours (it would cost money, so it is not sent) */
+  outside: number
+}
+
+/** Phone keys of everyone who messaged the bot number in the last 24 hours. */
+async function activePhoneKeys(db: ReturnType<typeof createServiceClient>): Promise<Set<string>> {
+  const { data: acts } = await db.from('lead_activities').select('lead_id')
+    .in('activity_type', ['whatsapp_in', 'whatsapp_message']).gte('created_at', windowStart().toISOString()).limit(5000)
+  const leadIds = [...new Set(((acts || []) as any[]).map((a) => a.lead_id))]
+  if (leadIds.length === 0) return new Set()
+  const { data: people } = await db.from('leads').select('phone').in('id', leadIds)
+  return new Set(((people || []) as any[]).map((p) => phoneMatchKey(p.phone)).filter(Boolean))
+}
+
+/** For the composer: how many of these leads can be messaged for free right now. */
+export async function getWhatsAppBotWindow(leadIds: string[]): Promise<{ configured: boolean; inWindow: number; outside: number; noPhone: number; error?: string }> {
+  const auth = await messagingAccess('view')
+  if (!auth.authorized) return { configured: false, inWindow: 0, outside: 0, noPhone: 0, error: auth.error }
+  const ids = cleanIds(leadIds)
+  if (!ids) return { configured: whatsappCredentialsConfigured(), inWindow: 0, outside: 0, noPhone: 0 }
+  const db = createServiceClient()
+  const { data: leads } = await db.from('leads').select('id, phone').in('id', ids)
+  const { inWindow, outside, noPhone } = splitByWindow((leads || []) as any[], await activePhoneKeys(db))
+  return { configured: whatsappCredentialsConfigured(), inWindow: inWindow.length, outside: outside.length, noPhone: noPhone.length }
+}
+
+/**
+ * Sends a custom WhatsApp message from the bot number, automatically, to the leads who messaged it in the last 24 hours.
+ * That is free. Everyone else is skipped, never sent (it would need a paid template). {name}/{project} are filled per lead.
+ */
+export async function sendWhatsAppViaBot(leadIds: string[], body: string): Promise<BotSendSummary | { error: string }> {
+  const auth = await messagingAccess('edit')
+  if (!auth.authorized) return { error: auth.error }
+  const ids = cleanIds(leadIds)
+  if (!ids) return { error: `Choose between 1 and ${OUTREACH_MAX_LEADS} leads.` }
+  const text = String(body || '').trim()
+  if (!text || text.length > 2000) return { error: 'Please write a message (up to 2,000 characters).' }
+  if (!whatsappCredentialsConfigured()) return { error: 'The WhatsApp bot is not set up yet (WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID in Vercel).' }
+
+  const db = createServiceClient()
+  const { data: leads } = await db.from('leads').select('id, name, phone, project').in('id', ids)
+  const { inWindow, outside, noPhone } = splitByWindow((leads || []) as any[], await activePhoneKeys(db))
+
+  const by = await actorName(db, auth.user)
+  const results: { lead: any; message: string; ok: boolean; error?: string }[] = []
+  // A few at a time: fast, and kind to WhatsApp's rate limits
+  for (let i = 0; i < inWindow.length; i += 5) {
+    const batch = inWindow.slice(i, i + 5)
+    results.push(...await Promise.all(batch.map(async (lead) => {
+      const message = personalize(text, lead)
+      const r = await sendWhatsAppText(phoneMatchKey(lead.phone).slice(1), message)
+      return { lead, message, ok: r.ok, error: r.error }
+    })))
+  }
+
+  const at = new Date().toISOString()
+  if (results.length) {
+    await db.from('lead_activities').insert(results.map((r) => r.ok
+      ? { lead_id: r.lead.id, activity_type: 'whatsapp_out', description: r.message, metadata: { bulk: true, _by_id: auth.user?.id || null, _by_name: by }, created_at: at }
+      : { lead_id: r.lead.id, activity_type: 'whatsapp_failed', description: `WhatsApp not sent by ${by} (${r.error || 'unknown error'}): ${r.message}`, metadata: { bulk: true, _error: r.error || null, _by_name: by }, created_at: at }))
+  }
+  revalidatePath('/crm/inbox')
+
+  const failed = results.filter((r) => !r.ok)
+  return {
+    sent: results.length - failed.length,
+    failed: failed.length,
+    skipped: noPhone.length,
+    outside: outside.length,
+    errors: [...new Set(failed.map((r) => r.error || 'Unknown error'))],
+  }
 }
