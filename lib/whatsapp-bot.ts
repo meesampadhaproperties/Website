@@ -17,7 +17,7 @@ import {
  */
 
 export function whatsappBotEnabled(): boolean {
-  return process.env.WHATSAPP_BOT_ENABLED === 'true' && !!process.env.WHATSAPP_ACCESS_TOKEN && !!process.env.WHATSAPP_PHONE_NUMBER_ID
+  return String(process.env.WHATSAPP_BOT_ENABLED || '').trim().toLowerCase() === 'true' && !!process.env.WHATSAPP_ACCESS_TOKEN && !!process.env.WHATSAPP_PHONE_NUMBER_ID
 }
 
 const siteUrl = () => getConfiguredSiteUrl() || 'https://meesampadha.com'
