@@ -8,7 +8,7 @@
  *   "incoming whatsapp" / "outgoing whatsapp"  entries from the previous bot (text in `details`)
  */
 
-export const WHATSAPP_ACTIVITY_TYPES = ['whatsapp_in', 'whatsapp_out', 'whatsapp_message'] as const
+export const WHATSAPP_ACTIVITY_TYPES = ['whatsapp_in', 'whatsapp_out', 'whatsapp_message', 'whatsapp_failed'] as const
 
 export interface ActivityLike {
   activity_type?: string | null

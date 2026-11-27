@@ -1,12 +1,10 @@
+import { DEFAULT_REPORT_TIMES, REPORT_SLOTS, normalizeReportTimes, toggleSlot } from './reports/slots'
 /**
  * Phone number normalization and Indian phone utilities
  */
 
-export const ALL_WA_REPORT_SLOTS = [
-  '08:00', '09:00', '10:00', '11:00', '12:00',
-  '13:00', '14:00', '15:00', '16:00', '17:00',
-  '18:00', '19:00', '20:00', '21:00'
-];
+/** The six report slots (see lib/reports/slots.ts). Kept for older imports. */
+export const ALL_WA_REPORT_SLOTS: string[] = [...REPORT_SLOTS]
 
 /**
  * Strips all non-digit characters and extracts standard canonical format
@@ -54,16 +52,10 @@ export function normalizeWaRecipientPhone(phone: string): { valid: boolean; phon
 }
 
 export function normalizeWaReportTimings(timings: any): string[] {
-  if (!Array.isArray(timings)) return ['09:00', '18:00'];
-  return timings.filter(t => typeof t === 'string' && t.includes(':'));
+  const t = normalizeReportTimes(timings)
+  return t.length ? t : [...DEFAULT_REPORT_TIMES]
 }
 
 export function toggleWaReportTiming(currentTimings: string[], slot: string): string[] {
-  const set = new Set(currentTimings || []);
-  if (set.has(slot)) {
-    set.delete(slot);
-  } else {
-    set.add(slot);
-  }
-  return Array.from(set).sort();
+  return toggleSlot(currentTimings, slot)
 }
