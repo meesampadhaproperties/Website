@@ -20,6 +20,8 @@ export type WhatsAppBubble =
   | { side: 'customer'; text: string }
   | { side: 'bot'; text: string }
   | { side: 'chip'; text: string }
+  /** Not a message (old internal summaries): not shown */
+  | { side: 'hidden' }
 
 const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
@@ -38,9 +40,9 @@ export function whatsappBubble(a: ActivityLike): WhatsAppBubble {
   if (type === 'whatsapp_in') return { side: 'customer', text: text || '(message)' }
   if (type === 'whatsapp_out') return { side: 'bot', text: text || '(reply)' }
   if (type === 'whatsapp_message') {
-    // Older entries: "WhatsApp bot: sent: hi" / "WhatsApp bot: looked at the projects list"
-    const t = text.replace(/^WhatsApp bot:\s*/i, '')
-    return { side: 'customer', text: t.replace(/^sent:\s*/i, '') || '(message)' }
+    // Older entries only kept a summary. Only "WhatsApp bot: sent: <text>" holds a real customer message.
+    const m = /^WhatsApp bot:\s*sent:\s*([\s\S]*)$/i.exec(text)
+    return m && m[1].trim() ? { side: 'customer', text: m[1].trim() } : { side: 'hidden' }
   }
   if (type.includes('incoming whatsapp')) return { side: 'customer', text: legacyText(String(a.details ?? a.description ?? '')) }
   if (type.includes('outgoing whatsapp')) return { side: 'bot', text: text || '(reply)' }

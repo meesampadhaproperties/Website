@@ -2172,6 +2172,7 @@ export default function LeadsClient({
                     );
                   }
 
+                  if (bubble.side === 'hidden') return null;
                   // Anything else in the lead's history (enquiries, status changes, emails) is a small grey note
                   return (
                     <div key={activity.id || idx} className="flex justify-center my-2">
