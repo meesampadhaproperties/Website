@@ -10,7 +10,8 @@ test('new bot entries: customer on one side, bot on the other', () => {
 
 test('older bot entries still read well', () => {
   assert.deepStrictEqual(whatsappBubble({ activity_type: 'whatsapp_message', description: 'WhatsApp bot: sent: hi' }), { side: 'customer', text: 'hi' });
-  assert.deepStrictEqual(whatsappBubble({ activity_type: 'whatsapp_message', description: 'WhatsApp bot: looked at the projects list' }), { side: 'customer', text: 'looked at the projects list' });
+  assert.deepStrictEqual(whatsappBubble({ activity_type: 'whatsapp_message', description: 'WhatsApp bot: looked at the projects list' }), { side: 'hidden' });
+  assert.deepStrictEqual(whatsappBubble({ activity_type: 'whatsapp_message', description: 'WhatsApp bot: asked for contact details' }), { side: 'hidden' });
 });
 
 test('entries from the previous bot (text in details) are understood', () => {
