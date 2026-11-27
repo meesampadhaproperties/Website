@@ -1,4 +1,4 @@
-import { COMPANY_NAME, META_GRAPH_BASE_URL } from '@/lib/site-config'
+import { COMPANY_NAME, META_GRAPH_BASE_URL, getConfiguredSiteUrl } from '@/lib/site-config'
 import { Resend } from 'resend'
 import { getDayBoundsIst, getIstCurrentDateString } from '@/lib/timezone'
 
@@ -24,6 +24,9 @@ export interface LeadReportData {
   followUpOverdue: number
   followUpDueToday: number
   recentLeads: { name: string; phone: string; status: string; project: string; created_at: string }[]
+  /** The window itself, for the download link */
+  windowStartIso: string
+  windowEndIso: string
 }
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
@@ -84,6 +87,8 @@ export async function buildLeadReport(db: any, windowStart: Date, windowEnd: Dat
     todayByStatus,
     followUpOverdue: Number(fu.overdue || 0),
     followUpDueToday: Number(fu.due_today || 0),
+    windowStartIso: windowStart.toISOString(),
+    windowEndIso: windowEnd.toISOString(),
     recentLeads: (recentRes.data || []).map((l: any) => ({
       name: l.name || 'Unnamed', phone: l.phone || '-', status: nameOf.get(String(l.status || 'new').toLowerCase()) || l.status || 'New',
       project: l.project || '-', created_at: l.created_at,
@@ -131,19 +136,56 @@ export async function sendReportEmail(to: string, r: LeadReportData, isTest = fa
 }
 
 /**
- * WhatsApp Cloud API. Business-initiated messages MUST use an APPROVED template
- * (free-form text is only allowed within 24h of the recipient messaging you).
- * Template body must have exactly 6 variables, in this order:
- *  {{1}} report time · {{2}} window · {{3}} new in window · {{4}} today total · {{5}} follow ups overdue · {{6}} due today
+ * The scheduled report on WhatsApp (staff recipients). A business-initiated message, so it MUST be an approved template.
+ * Template `crm_leads_report_link` (category UTILITY, English). Body, with 6 variables in this order:
+ *
+ *   📊 *Automated {{1}} CRM Report*
+ *
+ *   *Report:* {{2}}
+ *   *Generated:* {{3}}
+ *   *Coverage Window:* {{4}}
+ *
+ *   Total Leads in Slot: {{5}} • Download Excel: {{6}}
+ *
+ *   This link works for 7 days.
+ *
+ * {{1}} company · {{2}} "9 PM Report (6 PM – 9 PM)" · {{3}} generated · {{4}} coverage window · {{5}} leads in the window
+ * · {{6}} the signed Excel download link (see report-link.ts and /api/reports/download).
  */
+export const REPORT_TEMPLATE_NAME = 'crm_leads_report_link'
+
+const fmtStamp = (d: Date) => {
+  const date = d.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' })
+  const time = d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()
+  return { date, time }
+}
+const hourLabel = (d: Date) => d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: true }).toUpperCase()
+
+/** The six values for the template (single line each: WhatsApp does not allow line breaks inside a variable). */
+export function reportTemplateValues(r: LeadReportData, link: string, now = new Date()): string[] {
+  const start = new Date(r.windowStartIso), end = new Date(r.windowEndIso)
+  const gen = fmtStamp(now), from = fmtStamp(start), to = fmtStamp(end)
+  return [
+    COMPANY_NAME,
+    `${hourLabel(end)} Report (${hourLabel(start)} – ${hourLabel(end)})`,
+    `${gen.date} at ${gen.time}`,
+    `${from.date}, ${from.time} – ${to.date}, ${to.time}`,
+    String(r.windowTotal),
+    link,
+  ]
+}
+
 export async function sendReportWhatsApp(phone: string, r: LeadReportData): Promise<void> {
   const token = process.env.WHATSAPP_ACCESS_TOKEN
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID
-  const template = process.env.WHATSAPP_REPORT_TEMPLATE || 'crm_leads_report'
+  const template = process.env.WHATSAPP_REPORT_TEMPLATE || REPORT_TEMPLATE_NAME
   const lang = process.env.WHATSAPP_TEMPLATE_LANG || 'en'
   if (!token || !phoneId) throw new Error('WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID are not configured.')
 
-  const text = (v: string | number) => ({ type: 'text', text: String(v) })
+  const { signReportToken } = await import('./report-link')
+  const base = (getConfiguredSiteUrl() || 'https://meesampadha.com').replace(/\/+$/, '')
+  const link = `${base}/api/reports/download?token=${signReportToken(new Date(r.windowStartIso), new Date(r.windowEndIso))}`
+
   const res = await fetch(`${META_GRAPH_BASE_URL}/${encodeURIComponent(phoneId)}/messages`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -154,7 +196,7 @@ export async function sendReportWhatsApp(phone: string, r: LeadReportData): Prom
       template: {
         name: template,
         language: { code: lang },
-        components: [{ type: 'body', parameters: [text(r.slotLabel), text(r.windowLabel), text(r.windowTotal), text(r.todayTotal), text(r.followUpOverdue), text(r.followUpDueToday)] }],
+        components: [{ type: 'body', parameters: reportTemplateValues(r, link).map((t) => ({ type: 'text', text: t })) }],
       },
     }),
   })
