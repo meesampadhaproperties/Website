@@ -6,6 +6,9 @@ import { isValidMetaSignature } from '@/lib/meta-signature';
 
 /**
  * Meta Webhook Receiver (Real-Time Facebook & Instagram Lead Ads)
+ *
+ * The same URL also answers Meta's verification handshake for the WhatsApp Cloud API webhook
+ * (needs META_WEBHOOK_VERIFY_TOKEN in Vercel). Settings for the Meta app come from META_APP_ID and META_APP_SECRET.
  */
 
 export async function GET(request: Request) {
