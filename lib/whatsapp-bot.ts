@@ -5,6 +5,7 @@ import { canonicalPhoneNumber } from '@/lib/phone-input'
 import { mergeEnquiryProjects } from '@/lib/lead-fields'
 import { PROJECT_DOCUMENTS_BUCKET } from '@/lib/project-documents'
 import { videoOpenUrl } from '@/lib/video-link'
+import { websiteMediaUrl } from '@/lib/website-projects'
 import {
   MAX_DOCUMENTS, MAX_MESSAGE_AGE_SECONDS, clip, documentFileName, parseIncoming, projectRows, projectText, routeAction,
   type WaIncoming,
@@ -118,10 +119,11 @@ async function replyProject(to: string, projectId: string): Promise<{ title: str
     return null
   }
 
+  // The project's video: a link (YouTube, Instagram, ...) or an uploaded MP4 in the public website-media bucket
   const videoKey = (p as any).youtube_id as string | null
+  const videoUrl = videoKey ? videoOpenUrl(videoKey) : websiteMediaUrl(db, (p as any).video_path || null)
   await sendText(to, projectText({
-    title: p.title, location: p.location, tags: p.tags, points: p.points, mapUrl: p.map_url,
-    videoUrl: videoKey ? videoOpenUrl(videoKey) : null,
+    title: p.title, location: p.location, tags: p.tags, points: p.points, mapUrl: p.map_url, videoUrl,
   }))
 
   const docs = (((p as any).website_project_documents || []) as any[])
@@ -179,6 +181,13 @@ async function recordInCrm(db: any, m: WaIncoming, summary: string, project?: { 
     }).select('id').single()
     if (error || !data) throw new Error(error?.message || 'Could not save the WhatsApp lead')
     leadId = data.id
+    // Two messages from a new number can arrive at the same moment and both create a lead.
+    // The oldest lead wins: a newer duplicate removes itself and uses the oldest one.
+    const all = await findLeadsByPhone(db, phone, 'id, created_at')
+    if (all[0] && all[0].id !== leadId) {
+      await db.from('leads').delete().eq('id', leadId)
+      leadId = all[0].id
+    }
   } else {
     // A new conversation (12 hours after the last one) counts as another enquiry; messages in the same chat do not
     const last = existing.last_enquiry_at ? new Date(existing.last_enquiry_at).getTime() : 0
