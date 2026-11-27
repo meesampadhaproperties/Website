@@ -1,8 +1,12 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { fetchLeadData, fetchFormQuestions } from '@/lib/meta';
 import { ingestMetaLead } from '@/lib/meta-ingest';
 import { isValidMetaSignature } from '@/lib/meta-signature';
+import { handleWhatsAppWebhook } from '@/lib/whatsapp-bot';
+
+// The WhatsApp bot replies after the response is sent, and it may send several messages
+export const maxDuration = 60;
 
 /**
  * Meta Webhook Receiver (Real-Time Facebook & Instagram Lead Ads)
@@ -49,6 +53,12 @@ export async function POST(request: Request) {
     }
 
     const body = JSON.parse(rawBody);
+
+    // WhatsApp bot: answer Meta right away, then handle the customer's message
+    if (body.object === 'whatsapp_business_account') {
+      after(() => handleWhatsAppWebhook(body));
+      return NextResponse.json({ status: 'received' }, { status: 200 });
+    }
 
     if (body.object !== 'page') {
       return NextResponse.json({ status: 'ignored', reason: 'Not a page event' }, { status: 200 });
