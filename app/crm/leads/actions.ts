@@ -1,5 +1,6 @@
 'use server'
 
+import { queueWelcomeEmail } from '@/lib/welcome-email-send'
 import { createServiceClient, isSupabaseConfigured } from '@/lib/supabase/server'
 import { canonicalPhoneNumber } from '@/lib/phone-input'
 import { revalidatePath } from 'next/cache'
@@ -254,6 +255,7 @@ export async function createLead(formData: FormData): Promise<LeadSaveResult> {
   if (data?.[0]?.id) {
     await supabase.from('lead_activities').insert(manualEnquiryActivity(data[0].id, details, auth.user, by, true, now))
   }
+  queueWelcomeEmail(data?.[0]?.id)
 
   revalidatePath('/crm/leads')
   return { success: true, data: data || [] }

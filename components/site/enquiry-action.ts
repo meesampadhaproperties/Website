@@ -6,12 +6,14 @@ import { findLeadsByPhone } from '@/lib/lead-phone'
 import { canonicalPhoneNumber } from '@/lib/phone-input'
 import { cleanPhoneInput, phoneError } from '@/lib/phone-validation'
 import { redis } from '@/lib/redis'
+import { isValidEmail } from '@/lib/outreach'
+import { queueWelcomeEmail } from '@/lib/welcome-email-send'
 
 export type EnquiryState = {
   ok: boolean
   message?: string
-  errors?: { name?: string; phone?: string; message?: string }
-  values?: { name: string; phone: string; message: string }
+  errors?: { name?: string; phone?: string; email?: string; message?: string }
+  values?: { name: string; phone: string; email: string; message: string }
 }
 
 const clean = (v: FormDataEntryValue | null, max: number) =>
@@ -22,6 +24,7 @@ export async function submitEnquiry(_prev: EnquiryState, formData: FormData): Pr
   const values = {
     name: clean(formData.get('name'), 60),
     phone: cleanPhoneInput(String(formData.get('phone') ?? '')),
+    email: clean(formData.get('email'), 120).toLowerCase(),
     message: clean(formData.get('message'), 500),
   }
 
@@ -32,6 +35,7 @@ export async function submitEnquiry(_prev: EnquiryState, formData: FormData): Pr
   if (!/^[\p{L}][\p{L} .'-]{1,59}$/u.test(values.name)) errors.name = 'Enter your name (letters only)'
   const pe = phoneError(values.phone)
   if (pe) errors.phone = pe
+  if (values.email && !isValidEmail(values.email)) errors.email = 'Enter a valid email address, or leave it blank'
   if (values.message.length < 5) errors.message = 'Tell us a little more (at least 5 characters)'
   if (Object.keys(errors).length) return { ok: false, errors, values }
 
@@ -53,17 +57,19 @@ export async function submitEnquiry(_prev: EnquiryState, formData: FormData): Pr
     const now = new Date().toISOString()
 
     // One lead per person (matched by phone): repeat enquiries are added to their timeline.
-    const [existing] = await findLeadsByPhone(db, phone, 'id, enquiry_count', 1)
+    const [existing] = await findLeadsByPhone(db, phone, 'id, enquiry_count, email', 1)
     let leadId: string | undefined = existing?.id
     if (leadId) {
-      await db.from('leads').update({ enquiry_count: (Number(existing.enquiry_count) || 1) + 1, last_enquiry_at: now }).eq('id', leadId)
+      // A returning visitor who now gives an email gets it saved, but an email already on the lead is never replaced
+      await db.from('leads').update({ enquiry_count: (Number(existing.enquiry_count) || 1) + 1, last_enquiry_at: now, ...(values.email && !existing.email ? { email: values.email } : {}) }).eq('id', leadId)
     } else {
       const { data, error } = await db.from('leads').insert({
-        name: values.name, phone, email: null, message: values.message,
+        name: values.name, phone, email: values.email || null, message: values.message,
         source_page: 'website', status: 'new', enquiry_count: 1, last_enquiry_at: now,
       }).select('id').single()
       if (error || !data) throw new Error(error?.message || 'Insert failed')
       leadId = data.id
+      queueWelcomeEmail(leadId) // only sends when the Welcome email is switched on in CRM → Modules
     }
     await db.from('lead_activities').insert({
       lead_id: leadId, activity_type: 'website_enquiry',

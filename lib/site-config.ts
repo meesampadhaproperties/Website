@@ -86,6 +86,9 @@ export const SOCIAL_LINKS = {
   youtube: 'https://www.youtube.com/channel/UCP2_lvdFYHMyLF-GfQelPeA',
 }
 
+/** Job applications from the website's Careers page are emailed here. */
+export const CAREERS_EMAIL = 'agents@meesampadha.com'
+
 /** WhatsApp chat link with a prefilled message. */
 export const whatsappLink = (message: string) => `https://wa.me/${SITE_CONTACT.whatsappNumber}?text=${encodeURIComponent(message)}`
 

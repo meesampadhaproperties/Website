@@ -6,7 +6,7 @@ import { createServiceClient } from '@/lib/supabase/server'
  */
 
 import { WEBSITE_MEDIA_BUCKET, WEBSITE_GALLERY_BUCKET } from '@/lib/website-projects-shared'
-import { youtubeThumbUrl } from '@/lib/youtube'
+import { videoThumbUrl } from '@/lib/video-link'
 export * from '@/lib/website-projects-shared'
 
 export interface PublicWebsiteDownload { id: string; name: string }
@@ -136,7 +136,7 @@ export async function getPublishedReviews(): Promise<PublicReview[]> {
     const { data, error } = await createServiceClient()
       .from('website_reviews').select('id, title, youtube_id').eq('is_published', true).order('created_at', { ascending: false })
     if (error) throw new Error(error.message)
-    return ((data || []) as any[]).map(r => ({ id: r.id, title: r.title, youtube_id: r.youtube_id, thumb_url: youtubeThumbUrl(r.youtube_id) }))
+    return ((data || []) as any[]).map(r => ({ id: r.id, title: r.title, youtube_id: r.youtube_id, thumb_url: videoThumbUrl(r.youtube_id) || '' }))
   } catch (e) {
     if (process.env.NEXT_PHASE === 'phase-production-build') return []
     throw e

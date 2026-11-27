@@ -4,6 +4,7 @@ import { WhatsAppIcon } from '@/components/site/WhatsAppIcon'
 import { SITE_CONTACT, whatsappLink } from '@/lib/site-config'
 import { Roofline } from '@/components/site/Roofline'
 import { HeroSun } from '@/components/site/HeroSun'
+import { SocialLinks } from '@/components/site/SocialLinks'
 import { HowItWorks } from '@/components/site/HowItWorks'
 import { LookingFor } from '@/components/site/LookingFor'
 import { Reveal } from '@/components/site/Reveal'
@@ -84,6 +85,8 @@ export default async function HomePage() {
         <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_80%_20%,rgba(245,176,64,0.18),transparent_55%)]" />
         {/* Sun with rays: rises once on load, sits behind the copy on small screens */}
         <HeroSun className="absolute right-2 top-1 -z-10 h-20 w-20 opacity-70 sm:right-[8%] sm:top-16 sm:h-44 sm:w-44 sm:opacity-100 lg:h-52 lg:w-52" />
+        {/* Social links right under the sun (wide screens); on phones and tablets they sit below the buttons instead */}
+        <SocialLinks className="absolute right-[8%] top-[20rem] z-10 hidden w-52 justify-center lg:flex" />
         <div className={`${wrap} pb-60 pt-16 sm:pb-72 sm:pt-24`}>
           <h1 className="rise-in max-w-3xl font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-6xl">
             Find your home, apartment or land in Hyderabad
@@ -99,6 +102,7 @@ export default async function HomePage() {
               <WhatsAppIcon className="h-5 w-5" /> Chat on WhatsApp
             </a>
           </div>
+          <SocialLinks className="rise-in mt-6 lg:hidden" />
         </div>
         <a href="#looking-for" aria-label="Scroll down to explore" className="scroll-cue absolute bottom-3 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-2 text-white/70 transition-colors hover:text-site-gold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-site-gold">
           <span className="flex h-11 w-7 justify-center rounded-full border-2 border-current pt-2">
