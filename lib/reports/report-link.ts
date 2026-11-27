@@ -18,13 +18,21 @@ function secret(): string {
 
 const sign = (payload: string) => createHmac('sha256', secret()).update(payload).digest()
 
+const expiry = (now: Date) => now.getTime() + REPORT_LINK_DAYS * 24 * 60 * 60 * 1000
+
 export function signReportToken(start: Date, end: Date, now = new Date()): string {
-  const payload = b64(JSON.stringify({ s: start.getTime(), e: end.getTime(), x: now.getTime() + REPORT_LINK_DAYS * 24 * 60 * 60 * 1000 }))
+  const payload = b64(JSON.stringify({ s: start.getTime(), e: end.getTime(), x: expiry(now) }))
+  return `${payload}.${b64(sign(payload))}`
+}
+
+/** A link to the MASTER report: every lead from the very start up to `end`. */
+export function signMasterToken(end: Date, now = new Date()): string {
+  const payload = b64(JSON.stringify({ s: 0, e: end.getTime(), x: expiry(now), m: 1 }))
   return `${payload}.${b64(sign(payload))}`
 }
 
 /** The report window a valid, unexpired token stands for, or null. */
-export function verifyReportToken(token: string | null | undefined, now = new Date()): { start: Date; end: Date } | null {
+export function verifyReportToken(token: string | null | undefined, now = new Date()): { start: Date; end: Date; master: boolean } | null {
   const [payload, mac] = String(token || '').split('.')
   if (!payload || !mac) return null
   let expected: Buffer
@@ -32,8 +40,10 @@ export function verifyReportToken(token: string | null | undefined, now = new Da
   const given = Buffer.from(mac, 'base64url')
   if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null
   try {
-    const { s, e, x } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
-    if (![s, e, x].every(Number.isFinite) || x < now.getTime() || e <= s || e - s > MAX_WINDOW_MS) return null
-    return { start: new Date(s), end: new Date(e) }
+    const { s, e, x, m } = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+    if (![s, e, x].every(Number.isFinite) || x < now.getTime() || e <= s) return null
+    // Only a master link may cover more than a month
+    if (m !== 1 && e - s > MAX_WINDOW_MS) return null
+    return { start: new Date(s), end: new Date(e), master: m === 1 }
   } catch { return null }
 }

@@ -2,8 +2,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 require('../setup');
 process.env.CRON_SECRET = 'test-secret-for-report-links';
-const { signReportToken, verifyReportToken } = require('../../lib/reports/report-link');
-const { reportTemplateValues } = require('../../lib/reports/lead-report');
+const { signReportToken, signMasterToken, verifyReportToken } = require('../../lib/reports/report-link');
+const { reportTemplateValues, renderReportEmail, reportFileNames, reportTitle } = require('../../lib/reports/lead-report');
 
 const start = new Date('2026-11-27T12:30:00Z'), end = new Date('2026-11-27T15:30:00Z');
 
@@ -38,4 +38,30 @@ test('the template gets six single-line values in the right order', () => {
   assert.strictEqual(v[4], '3');
   assert.strictEqual(v[5], 'https://x.test/r?token=abc');
   for (const x of v) assert.ok(!/[\n\r\t]/.test(x));
+});
+
+test('the master link covers everything up to its time, and only it may span more than a month', () => {
+  const w = verifyReportToken(signMasterToken(end));
+  assert.strictEqual(w.master, true);
+  assert.strictEqual(w.start.getTime(), 0);
+  assert.strictEqual(w.end.getTime(), end.getTime());
+  assert.strictEqual(verifyReportToken(signReportToken(start, end)).master, false);
+});
+
+test('report title, file names and email follow the example', () => {
+  const r = { windowStartIso: start.toISOString(), windowEndIso: end.toISOString(), windowTotal: 1 };
+  assert.strictEqual(reportTitle(r), '9 PM Report (6 PM – 9 PM)');
+  assert.deepStrictEqual(reportFileNames(r), { report: 'leads_report_2026-11-27_09pm.xlsx', master: 'master_leads_report_till_2026-11-27_09pm.xlsx' });
+  const e = renderReportEmail(r, 'Mee Sampadha', false, true);
+  assert.strictEqual(e.subject, '[Mee Sampadha CRM] 9 PM Report (6 PM – 9 PM)');
+  assert.match(e.html, /Mee Sampadha Leads Report/);
+  assert.match(e.html, /Total leads in this report: <b>1<\/b>/);
+  assert.match(e.html, /master report/);
+  assert.doesNotMatch(renderReportEmail(r, 'Mee Sampadha').html, /master report/);
+  assert.match(renderReportEmail(r, '<b>X</b>').html, /&lt;b&gt;X&lt;\/b&gt;/); // company name is escaped
+});
+
+test('the 6 AM report spans midnight in its title', () => {
+  const r = { windowStartIso: '2026-11-27T15:30:00Z', windowEndIso: '2026-11-28T00:30:00Z' };
+  assert.strictEqual(reportTitle(r), '6 AM Report (9 PM – 6 AM)');
 });

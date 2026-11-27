@@ -12,8 +12,7 @@ import { getDayBoundsIst, getIstCurrentDateString } from '@/lib/timezone'
  * Numbers come from the same exact DB aggregation as /crm/reports (crm_leads_report).
  */
 
-export const REPORT_SLOTS = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00', '21:00']
-export const DEFAULT_REPORT_TIMES = ['09:00', '18:00']
+export { REPORT_SLOTS, DEFAULT_REPORT_TIMES, currentIstSlot, istToUtc, windowForSlot, normalizeReportTimes } from './slots'
 
 export interface LeadReportData {
   slotLabel: string        // "12:00 PM IST, 22 Nov 2026"
@@ -29,33 +28,8 @@ export interface LeadReportData {
   windowEndIso: string
 }
 
-const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000
-
-/** Current IST "HH:00" slot and its date, for an optional override hour. */
-export function currentIstSlot(now = new Date()): { date: string; slot: string } {
-  const ist = new Date(now.getTime() + IST_OFFSET_MS)
-  return { date: ist.toISOString().slice(0, 10), slot: `${String(ist.getUTCHours()).padStart(2, '0')}:00` }
-}
-
-/** UTC instant for an IST date + "HH:MM". */
-export function istToUtc(date: string, hhmm: string): Date {
-  return new Date(`${date}T${hhmm}:00+05:30`)
-}
-
 const fmtTime = (d: Date) => d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', minute: '2-digit', hour12: true })
 const fmtDate = (d: Date) => d.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' })
-
-/**
- * Window start for a recipient: their previous selected slot today, else their last slot yesterday
- * (so consecutive reports never overlap and never leave gaps).
- */
-export function windowStartFor(times: string[], date: string, slot: string): Date {
-  const sorted = [...new Set(times)].filter(t => REPORT_SLOTS.includes(t)).sort()
-  const prevToday = sorted.filter(t => t < slot).pop()
-  if (prevToday) return istToUtc(date, prevToday)
-  const last = sorted[sorted.length - 1] || slot
-  return new Date(istToUtc(date, last).getTime() - 24 * 60 * 60 * 1000)
-}
 
 export async function buildLeadReport(db: any, windowStart: Date, windowEnd: Date): Promise<LeadReportData> {
   const today = getIstCurrentDateString()
@@ -98,40 +72,49 @@ export async function buildLeadReport(db: any, windowStart: Date, windowEnd: Dat
 
 const esc = (s: string) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
 
-export function renderReportEmail(r: LeadReportData, companyName: string, isTest = false): { subject: string; html: string } {
-  const statusRows = r.todayByStatus.map(s =>
-    `<tr><td style="padding:8px 12px;font-size:13px;color:#0f1d33;border-top:1px solid #e8ecf2">${esc(s.name)}</td><td style="padding:8px 12px;font-size:13px;font-weight:bold;color:#0f1d33;text-align:right;border-top:1px solid #e8ecf2">${s.count}</td></tr>`).join('')
-  const leadRows = r.recentLeads.map(l =>
-    `<tr><td style="padding:8px;font-size:12px;color:#0f1d33;border-top:1px solid #e8ecf2">${esc(l.name)}</td><td style="padding:8px;font-size:12px;color:#5a6a82;border-top:1px solid #e8ecf2">${esc(l.phone)}</td><td style="padding:8px;font-size:12px;color:#5a6a82;border-top:1px solid #e8ecf2">${esc(l.project)}</td><td style="padding:8px;font-size:12px;color:#1e3a5f;font-weight:bold;border-top:1px solid #e8ecf2">${esc(l.status)}</td></tr>`).join('')
-  const html = `
-<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e8ecf2;border-radius:12px;overflow:hidden">
-  <div style="background:#0f1d33;padding:20px 24px">
-    <h2 style="color:#fff;margin:0;font-size:18px">${esc(companyName)} · Leads Report${isTest ? ' (Test)' : ''}</h2>
-    <p style="color:#c4a55a;margin:6px 0 0;font-size:13px;font-weight:bold">${esc(r.slotLabel)}</p>
-  </div>
-  <div style="padding:20px 24px">
-    <table style="width:100%;border-collapse:collapse;background:#f8fafc;border-radius:8px">
-      <tr><td style="padding:12px;font-size:13px;color:#5a6a82">New leads (${esc(r.windowLabel)})</td><td style="padding:12px;font-size:20px;font-weight:bold;color:#0f1d33;text-align:right">${r.windowTotal}</td></tr>
-      <tr><td style="padding:12px;font-size:13px;color:#5a6a82;border-top:1px solid #e8ecf2">Total leads today</td><td style="padding:12px;font-size:16px;font-weight:bold;color:#0f1d33;text-align:right;border-top:1px solid #e8ecf2">${r.todayTotal}</td></tr>
-      <tr><td style="padding:12px;font-size:13px;color:#b91c1c;border-top:1px solid #e8ecf2">Follow ups overdue</td><td style="padding:12px;font-size:16px;font-weight:bold;color:#b91c1c;text-align:right;border-top:1px solid #e8ecf2">${r.followUpOverdue}</td></tr>
-      <tr><td style="padding:12px;font-size:13px;color:#c2410c;border-top:1px solid #e8ecf2">Follow ups due today</td><td style="padding:12px;font-size:16px;font-weight:bold;color:#c2410c;text-align:right;border-top:1px solid #e8ecf2">${r.followUpDueToday}</td></tr>
-    </table>
-    ${statusRows ? `<h3 style="font-size:14px;color:#0f1d33;margin:20px 0 6px">Today by status</h3><table style="width:100%;border-collapse:collapse">${statusRows}</table>` : ''}
-    ${leadRows ? `<h3 style="font-size:14px;color:#0f1d33;margin:20px 0 6px">Latest leads in this window</h3><table style="width:100%;border-collapse:collapse"><tr><th style="text-align:left;font-size:11px;color:#5a6a82;padding:6px 8px">Name</th><th style="text-align:left;font-size:11px;color:#5a6a82;padding:6px 8px">Phone</th><th style="text-align:left;font-size:11px;color:#5a6a82;padding:6px 8px">Project</th><th style="text-align:left;font-size:11px;color:#5a6a82;padding:6px 8px">Status</th></tr>${leadRows}</table>` : '<p style="font-size:13px;color:#8a99ad;margin-top:16px">No new leads in this window.</p>'}
-  </div>
-  <div style="background:#f8fafc;border-top:1px solid #e8ecf2;padding:12px 24px;font-size:11px;color:#8a99ad">Automated report from your CRM. Times are India Standard Time.</div>
-</div>`
-  return { subject: `${isTest ? '[Test] ' : ''}${companyName} Leads Report: ${r.windowTotal} new · ${r.slotLabel}`, html }
+/** "9 PM Report (6 PM – 9 PM)" */
+export function reportTitle(r: Pick<LeadReportData, 'windowStartIso' | 'windowEndIso'>): string {
+  const hour = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: 'numeric', hour12: true }).toUpperCase()
+  return `${hour(r.windowEndIso)} Report (${hour(r.windowStartIso)} – ${hour(r.windowEndIso)})`
 }
 
-export async function sendReportEmail(to: string, r: LeadReportData, isTest = false): Promise<void> {
+/** The report email, in the plain style of the example: a short note, the total, and the Excel file(s) attached. */
+export function renderReportEmail(r: LeadReportData, companyName: string, isTest = false, hasMaster = false): { subject: string; html: string; text: string } {
+  const title = reportTitle(r)
+  const masterLine = hasMaster ? 'A <b>master report</b> with every lead from the start till now is attached as well.' : ''
+  const html = `
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.6;color:#1f2937;max-width:620px">
+  <h1 style="margin:0 0 18px;font-size:26px;color:#111827">${esc(companyName)} Leads Report${isTest ? ' (Test)' : ''}</h1>
+  <p style="margin:0 0 14px">Attached is the leads report for <b>${esc(title)}</b>.</p>
+  ${masterLine ? `<p style="margin:0 0 14px">${masterLine}</p>` : ''}
+  <p style="margin:0 0 26px">Total leads in this report: <b>${r.windowTotal}</b></p>
+  <p style="margin:0;color:#6b7280">This is an automated system email.</p>
+</div>`
+  const text = `${companyName} Leads Report${isTest ? ' (Test)' : ''}\n\nAttached is the leads report for ${title}.${hasMaster ? '\nA master report with every lead from the start till now is attached as well.' : ''}\n\nTotal leads in this report: ${r.windowTotal}\n\nThis is an automated system email.`
+  return { subject: `${isTest ? '[Test] ' : ''}[${companyName} CRM] ${title}`, html, text }
+}
+
+export interface ReportFile { filename: string; content: Buffer }
+
+/** File names like leads_report_2026-11-27_09pm.xlsx */
+export function reportFileNames(r: Pick<LeadReportData, 'windowEndIso'>): { report: string; master: string } {
+  const end = new Date(r.windowEndIso)
+  const day = end.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+  const hr = end.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', hour12: true }).replace(/\s/g, '').toLowerCase()
+  return { report: `leads_report_${day}_${hr}.xlsx`, master: `master_leads_report_till_${day}_${hr}.xlsx` }
+}
+
+export async function sendReportEmail(to: string, r: LeadReportData, isTest = false, files: ReportFile[] = []): Promise<void> {
   const apiKey = process.env.RESEND_API_KEY
   const from = process.env.RESEND_FROM_EMAIL
   if (!apiKey) throw new Error('RESEND_API_KEY is not configured.')
   if (!from || from.endsWith('@yourdomain.com')) throw new Error('RESEND_FROM_EMAIL is not configured with a verified sender domain.')
   const companyName = COMPANY_NAME
-  const { subject, html } = renderReportEmail(r, companyName, isTest)
-  const { error } = await new Resend(apiKey).emails.send({ from: `${companyName} Reports <${from}>`, to, subject, html })
+  const { subject, html, text } = renderReportEmail(r, companyName, isTest, files.length > 1)
+  const { error } = await new Resend(apiKey).emails.send({
+    from: `${companyName} Reports <${from}>`, to, subject, html, text,
+    ...(files.length ? { attachments: files.map((f) => ({ filename: f.filename, content: f.content })) } : {}),
+  })
   if (error) throw new Error(error.message || 'Resend rejected the email')
 }
 
@@ -153,6 +136,8 @@ export async function sendReportEmail(to: string, r: LeadReportData, isTest = fa
  * · {{6}} the signed Excel download link (see report-link.ts and /api/reports/download).
  */
 export const REPORT_TEMPLATE_NAME = 'crm_leads_report_link'
+/** Same message plus a 7th variable: the master report link. Body adds: "Master Report (all leads till date): {{7}}" before the last line. */
+export const REPORT_MASTER_TEMPLATE_NAME = 'crm_leads_report_master'
 
 const fmtStamp = (d: Date) => {
   const date = d.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata', day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -167,7 +152,7 @@ export function reportTemplateValues(r: LeadReportData, link: string, now = new 
   const gen = fmtStamp(now), from = fmtStamp(start), to = fmtStamp(end)
   return [
     COMPANY_NAME,
-    `${hourLabel(end)} Report (${hourLabel(start)} – ${hourLabel(end)})`,
+    reportTitle(r),
     `${gen.date} at ${gen.time}`,
     `${from.date}, ${from.time} – ${to.date}, ${to.time}`,
     String(r.windowTotal),
@@ -175,16 +160,19 @@ export function reportTemplateValues(r: LeadReportData, link: string, now = new 
   ]
 }
 
-export async function sendReportWhatsApp(phone: string, r: LeadReportData): Promise<void> {
+export async function sendReportWhatsApp(phone: string, r: LeadReportData, withMaster = false): Promise<void> {
   const token = process.env.WHATSAPP_ACCESS_TOKEN
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID
-  const template = process.env.WHATSAPP_REPORT_TEMPLATE || REPORT_TEMPLATE_NAME
+  const template = withMaster
+    ? (process.env.WHATSAPP_REPORT_MASTER_TEMPLATE || REPORT_MASTER_TEMPLATE_NAME)
+    : (process.env.WHATSAPP_REPORT_TEMPLATE || REPORT_TEMPLATE_NAME)
   const lang = process.env.WHATSAPP_TEMPLATE_LANG || 'en'
   if (!token || !phoneId) throw new Error('WHATSAPP_ACCESS_TOKEN / WHATSAPP_PHONE_NUMBER_ID are not configured.')
 
-  const { signReportToken } = await import('./report-link')
+  const { signReportToken, signMasterToken } = await import('./report-link')
   const base = (getConfiguredSiteUrl() || 'https://meesampadha.com').replace(/\/+$/, '')
   const link = `${base}/api/reports/download?token=${signReportToken(new Date(r.windowStartIso), new Date(r.windowEndIso))}`
+  const masterLink = `${base}/api/reports/download?token=${signMasterToken(new Date(r.windowEndIso))}`
 
   const res = await fetch(`${META_GRAPH_BASE_URL}/${encodeURIComponent(phoneId)}/messages`, {
     method: 'POST',
@@ -196,7 +184,7 @@ export async function sendReportWhatsApp(phone: string, r: LeadReportData): Prom
       template: {
         name: template,
         language: { code: lang },
-        components: [{ type: 'body', parameters: reportTemplateValues(r, link).map((t) => ({ type: 'text', text: t })) }],
+        components: [{ type: 'body', parameters: [...reportTemplateValues(r, link), ...(withMaster ? [masterLink] : [])].map((t) => ({ type: 'text', text: t })) }],
       },
     }),
   })

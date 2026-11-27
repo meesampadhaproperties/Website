@@ -14,13 +14,13 @@ export async function GET(request: Request) {
   const win = verifyReportToken(new URL(request.url).searchParams.get('token'))
   if (!win) return new NextResponse('This report link is invalid or has expired.', { status: 403 })
   try {
-    const buffer = await buildReportWorkbook(createServiceClient(), win.start, win.end)
+    const buffer = await buildReportWorkbook(createServiceClient(), win.start, win.end, win.master)
     const day = win.end.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
     return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="leads-report-${day}.xlsx"`,
+        'Content-Disposition': `attachment; filename="${win.master ? 'master-leads-report-till' : 'leads-report'}-${day}.xlsx"`,
         'Cache-Control': 'no-store',
       },
     })

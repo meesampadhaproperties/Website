@@ -1,5 +1,7 @@
 'use client'
 
+import ReportSlotPicker from './ReportSlotPicker'
+
 import React from 'react'
 import { 
   MessageCircle, 
@@ -117,6 +119,8 @@ interface WhatsAppRecipientsModalProps {
   setEditWaPhone: (phone: string) => void
   editWaTimings: string[]
   setEditWaTimings: (timings: string[]) => void
+  editWaMaster: string[]
+  setEditWaMaster: (m: string[]) => void
   isSavingWaEdit: boolean
   onStartEditWa: (recipient: WaRecipient) => void
   onSaveWaEdit: (id: string) => void
@@ -145,6 +149,8 @@ function WhatsAppRecipientsModal({
   setEditWaPhone,
   editWaTimings,
   setEditWaTimings,
+  editWaMaster,
+  setEditWaMaster,
   isSavingWaEdit,
   onStartEditWa,
   onSaveWaEdit,
@@ -268,33 +274,7 @@ function WhatsAppRecipientsModal({
                       </div>
                     </div>
                   </div>
-                  <div className="mt-2.5">
-                    <label className="block text-[11px] font-semibold text-[#5a6a82] mb-1">
-                      Report Timings <span className="text-[10px] text-gray-400 font-normal">(Select time slots to receive reports)</span>
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {ALL_WA_REPORT_SLOTS.map(time => {
-                        const label = parseInt(time) <= 12 ? `${time} AM` : `${parseInt(time) - 12} PM`
-                        const isSelected = activeSlots.includes(time)
-                        return (
-                          <button
-                            key={time}
-                            type="button"
-                            onClick={() => {
-                              setEditWaTimings(toggleWaReportTiming(editWaTimings, time))
-                            }}
-                            className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                              isSelected 
-                                ? 'bg-green-600 text-white border-green-600 font-semibold shadow-sm' 
-                                : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
+                  <ReportSlotPicker times={editWaTimings} onTimes={setEditWaTimings} master={editWaMaster} onMaster={setEditWaMaster} tone="green" />
                   <div className="flex items-center justify-end gap-2 pt-1">
                     <button
                       type="button"
@@ -409,6 +389,8 @@ export interface WhatsAppReportsProps {
   setEditWaPhone: (phone: string) => void
   editWaTimings: string[]
   setEditWaTimings: (timings: string[]) => void
+  editWaMaster: string[]
+  setEditWaMaster: (m: string[]) => void
   isSavingWaEdit: boolean
   onStartEditWa: (recipient: WaRecipient) => void
   onSaveWaEdit: (id: string) => void
@@ -445,6 +427,8 @@ export default function WhatsAppReports({
   setEditWaPhone,
   editWaTimings,
   setEditWaTimings,
+  editWaMaster,
+  setEditWaMaster,
   isSavingWaEdit,
   onStartEditWa,
   onSaveWaEdit,
@@ -546,6 +530,8 @@ export default function WhatsAppReports({
         setEditWaPhone={setEditWaPhone}
         editWaTimings={editWaTimings}
         setEditWaTimings={setEditWaTimings}
+        editWaMaster={editWaMaster}
+        setEditWaMaster={setEditWaMaster}
         isSavingWaEdit={isSavingWaEdit}
         onStartEditWa={onStartEditWa}
         onSaveWaEdit={onSaveWaEdit}

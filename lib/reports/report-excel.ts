@@ -1,24 +1,31 @@
 import ExcelJS from 'exceljs'
 
-const MAX_ROWS = 5000
+/** The database returns at most 1000 rows per request, so leads are read page by page. */
+const PAGE = 1000
+const MAX_ROWS = 20000
 
 const ist = (d: string) => new Date(d).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })
 
 /** The Excel file behind a report: every lead created in the window. Server only. */
-export async function buildReportWorkbook(db: any, start: Date, end: Date): Promise<Buffer> {
-  const [leadsRes, statusRes, sourceRes] = await Promise.all([
-    db.from('leads').select('name, phone, email, project, source_page, status, created_at')
-      .gte('created_at', start.toISOString()).lte('created_at', end.toISOString())
-      .order('created_at', { ascending: true }).limit(MAX_ROWS),
+export async function buildReportWorkbook(db: any, start: Date, end: Date, master = false): Promise<Buffer> {
+  const rows: any[] = []
+  for (let from = 0; from < MAX_ROWS; from += PAGE) {
+    let q = db.from('leads').select('name, phone, email, project, source_page, status, created_at').lte('created_at', end.toISOString())
+    if (!master) q = q.gte('created_at', start.toISOString())
+    const { data, error } = await q.order('created_at', { ascending: true }).order('id', { ascending: true }).range(from, from + PAGE - 1)
+    if (error) throw new Error(error.message)
+    rows.push(...(data || []))
+    if (!data || data.length < PAGE) break
+  }
+  const [statusRes, sourceRes] = await Promise.all([
     db.from('lead_statuses').select('key, name'),
     db.from('lead_sources').select('key, name'),
   ])
-  if (leadsRes.error) throw new Error(leadsRes.error.message)
   const status = new Map<string, string>((statusRes.data || []).map((s: any) => [String(s.key).toLowerCase(), s.name]))
   const source = new Map<string, string>((sourceRes.data || []).map((s: any) => [String(s.key).toLowerCase(), s.name]))
 
   const wb = new ExcelJS.Workbook()
-  const ws = wb.addWorksheet('Leads')
+  const ws = wb.addWorksheet(master ? 'Master report' : 'Leads')
   ws.columns = [
     { header: 'Sr. No', key: 'n', width: 8 }, { header: 'Date (IST)', key: 'at', width: 22 }, { header: 'Name', key: 'name', width: 26 },
     { header: 'Phone', key: 'phone', width: 18 }, { header: 'Email', key: 'email', width: 30 }, { header: 'Project', key: 'project', width: 28 },
@@ -28,7 +35,7 @@ export async function buildReportWorkbook(db: any, start: Date, end: Date): Prom
   ws.views = [{ state: 'frozen', ySplit: 1 }]
   // Cells that start with = + - @ are text, never formulas (a lead's name must not run as a formula in Excel)
   const safe = (v: unknown) => { const t = String(v ?? ''); return /^[=+\-@]/.test(t) ? `'${t}` : t }
-  ;(leadsRes.data || []).forEach((l: any, i: number) => ws.addRow({
+  ;rows.forEach((l: any, i: number) => ws.addRow({
     n: i + 1, at: ist(l.created_at), name: safe(l.name), phone: safe(l.phone), email: safe(l.email), project: safe(l.project),
     source: source.get(String(l.source_page || '').toLowerCase()) || safe(l.source_page), status: status.get(String(l.status || 'new').toLowerCase()) || safe(l.status),
   }))

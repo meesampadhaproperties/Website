@@ -1,5 +1,7 @@
 'use client'
 
+import ReportSlotPicker from './ReportSlotPicker'
+
 import React from 'react'
 import { 
   Mail, 
@@ -109,6 +111,8 @@ interface EmailRecipientsModalProps {
   setEditEmailAddress: (email: string) => void
   editEmailTimings: string[]
   setEditEmailTimings: (timings: string[]) => void
+  editEmailMaster: string[]
+  setEditEmailMaster: (m: string[]) => void
   isSavingEmailEdit: boolean
   onStartEditEmail: (recipient: ReportRecipient) => void
   onSaveEmailEdit: (id: string) => void
@@ -135,6 +139,8 @@ function EmailRecipientsModal({
   setEditEmailAddress,
   editEmailTimings,
   setEditEmailTimings,
+  editEmailMaster,
+  setEditEmailMaster,
   isSavingEmailEdit,
   onStartEditEmail,
   onSaveEmailEdit,
@@ -240,43 +246,7 @@ function EmailRecipientsModal({
                       </div>
                     </div>
                   </div>
-                  <div className="mt-2.5">
-                    <label className="block text-[11px] font-semibold text-[#5a6a82] mb-1">
-                      Report Timings <span className="text-[10px] text-gray-400 font-normal">(Select time slots to receive reports)</span>
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {['6', '9', '12', '15', '18', '21'].map(time => {
-                        const label = parseInt(time) <= 12 ? `${time} AM` : `${parseInt(time) - 12} PM`
-                        const isSelected = editEmailTimings.includes(time) || editEmailTimings.length === 0
-                        return (
-                          <button
-                            key={time}
-                            type="button"
-                            onClick={() => {
-                              let newTimings = [...editEmailTimings]
-                              if (editEmailTimings.length === 0) {
-                                newTimings = ['6', '9', '12', '15', '18', '21'].filter(t => t !== time)
-                              } else {
-                                if (isSelected) {
-                                  newTimings = newTimings.filter(t => t !== time)
-                                } else {
-                                  newTimings.push(time)
-                                }
-                              }
-                              setEditEmailTimings(newTimings)
-                            }}
-                            className={`px-3 py-1 text-xs rounded-lg border transition-colors ${
-                              isSelected 
-                                ? 'bg-[#1e3a5f] text-white border-[#1e3a5f]' 
-                                : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
+                  <ReportSlotPicker times={editEmailTimings} onTimes={setEditEmailTimings} master={editEmailMaster} onMaster={setEditEmailMaster} tone="navy" />
                   <div className="flex items-center justify-end gap-2 pt-1">
                     <button
                       type="button"
@@ -396,6 +366,8 @@ export interface AutomatedReportsEmailProps {
   setEditEmailAddress: (email: string) => void
   editEmailTimings: string[]
   setEditEmailTimings: (timings: string[]) => void
+  editEmailMaster: string[]
+  setEditEmailMaster: (m: string[]) => void
   isSavingEmailEdit: boolean
   onStartEditEmail: (recipient: ReportRecipient) => void
   onSaveEmailEdit: (id: string) => void
@@ -435,6 +407,8 @@ export default function AutomatedReportsEmail({
   setEditEmailAddress,
   editEmailTimings,
   setEditEmailTimings,
+  editEmailMaster,
+  setEditEmailMaster,
   isSavingEmailEdit,
   onStartEditEmail,
   onSaveEmailEdit,
@@ -584,6 +558,8 @@ export default function AutomatedReportsEmail({
         setEditEmailAddress={setEditEmailAddress}
         editEmailTimings={editEmailTimings}
         setEditEmailTimings={setEditEmailTimings}
+        editEmailMaster={editEmailMaster}
+        setEditEmailMaster={setEditEmailMaster}
         isSavingEmailEdit={isSavingEmailEdit}
         onStartEditEmail={onStartEditEmail}
         onSaveEmailEdit={onSaveEmailEdit}
