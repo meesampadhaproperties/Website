@@ -108,7 +108,7 @@ async function replyProjectList(to: string, page: number) {
 const FOLLOW_UP_BUTTONS = [{ id: 'explore', title: 'More projects' }, { id: 'contact', title: 'Contact us' }, { id: 'menu', title: 'Main menu' }]
 
 /** Sends the project summary and its documents. Returns the project's title (for the lead history), or null if not found. */
-async function replyProject(to: string, projectId: string): Promise<{ title: string; crmProjectId: string | null } | null> {
+async function replyProject(to: string, projectId: string): Promise<{ title: string; crmProjectId: string | null; sent: string[] } | null> {
   const db = createServiceClient()
   const { data: p } = await db.from('website_projects')
     .select('id, title, location, tags, points, map_url, youtube_id, video_path, crm_project_id, website_project_documents(sort_order, project_documents(id, name, doc_type, url, storage_path, mime_type))')
@@ -131,6 +131,7 @@ async function replyProject(to: string, projectId: string): Promise<{ title: str
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((l) => l.project_documents as { id: string; name: string; doc_type: string; url: string | null; storage_path: string | null })
   const shown = docs.slice(0, MAX_DOCUMENTS)
+  const sentNames: string[] = []
 
   if (shown.length === 0) {
     await sendText(to, `The brochure and documents for this project are coming soon. Call us on ${SITE_CONTACT.phone} for details.`)
@@ -138,6 +139,7 @@ async function replyProject(to: string, projectId: string): Promise<{ title: str
   for (const d of shown) {
     if (d.doc_type === 'link' && d.url && /^https?:\/\//i.test(d.url)) {
       await sendText(to, `${clip(d.name, 80)}: ${d.url}`)
+      sentNames.push(`${d.name} (link)`)
       continue
     }
     let sent = false
@@ -148,17 +150,18 @@ async function replyProject(to: string, projectId: string): Promise<{ title: str
     }
     // If WhatsApp could not take the file, send the website link instead
     if (!sent) await sendText(to, `${clip(d.name, 80)}: ${siteUrl()}/api/website-projects/download/${d.id}`)
+    sentNames.push(sent ? d.name : `${d.name} (website link)`)
   }
   if (docs.length > shown.length) await sendText(to, `More documents for this project are on our website: ${siteUrl()}/projects`)
 
   await sendButtons(to, 'What would you like to do next?', FOLLOW_UP_BUTTONS)
-  return { title: p.title, crmProjectId: (p as any).crm_project_id || null }
+  return { title: p.title, crmProjectId: (p as any).crm_project_id || null, sent: sentNames }
 }
 
 // ---------------------------------------------------------------- CRM lead
 
 /** Saves the person as a lead (one lead per phone number) and writes what they did in the lead's history. */
-async function recordInCrm(db: any, m: WaIncoming, summary: string, project?: { title: string; crmProjectId: string | null } | null) {
+async function recordInCrm(db: any, m: WaIncoming, said: string, replied: string, project?: { title: string; crmProjectId: string | null } | null) {
   const phone = canonicalPhoneNumber(m.from)
   const now = new Date().toISOString()
   const [existing] = await findLeadsByPhone(db, phone, 'id, name, enquiry_count, last_enquiry_at, enquiry_projects', 1)
@@ -200,10 +203,13 @@ async function recordInCrm(db: any, m: WaIncoming, summary: string, project?: { 
     }).eq('id', leadId)
   }
 
-  await db.from('lead_activities').insert({
-    lead_id: leadId, activity_type: 'whatsapp_message', description: `WhatsApp bot: ${summary}`,
-    metadata: { wa_message_id: m.id, from: m.from },
-  })
+  // Both sides of the chat, in order: what the customer sent (at the time they sent it), then the bot's reply
+  const nowMs = Date.now()
+  const sentAt = m.timestamp && m.timestamp * 1000 < nowMs ? m.timestamp * 1000 : nowMs - 1000
+  await db.from('lead_activities').insert([
+    { lead_id: leadId, activity_type: 'whatsapp_in', description: said, metadata: { wa_message_id: m.id, from: m.from, type: m.type }, created_at: new Date(sentAt).toISOString() },
+    { lead_id: leadId, activity_type: 'whatsapp_out', description: replied, metadata: { reply_to: m.id }, created_at: new Date(Math.max(nowMs, sentAt + 1)).toISOString() },
+  ])
 }
 
 // ---------------------------------------------------------------- entry point
@@ -217,28 +223,34 @@ async function handleMessage(m: WaIncoming) {
   if (m.timestamp && Date.now() / 1000 - m.timestamp > MAX_MESSAGE_AGE_SECONDS) return
 
   const action = routeAction(m)
-  let summary: string
-  let project: { title: string; crmProjectId: string | null } | null = null
+  // What the customer did, in plain words for the CRM chat view
+  const said = m.text ? clip(m.text, 1000)
+    : m.actionTitle ? `Tapped "${m.actionTitle}"`
+    : `Sent ${/^[aeiou]/i.test(m.type) ? 'an' : 'a'} ${m.type || 'message'}`
+  let replied: string
+  let project: { title: string; crmProjectId: string | null; sent: string[] } | null = null
 
   switch (action.kind) {
     case 'explore':
-      summary = 'looked at the projects list'
+      replied = action.page > 1 ? `Sent the projects list (page ${action.page})` : 'Sent the projects list'
       await replyProjectList(m.from, action.page)
       break
     case 'project':
       project = await replyProject(m.from, action.id)
-      summary = project ? `opened the project "${project.title}" and received its documents` : 'asked for a project that is no longer available'
+      replied = !project ? 'That project is no longer available. Sent the projects list again.'
+        : project.sent.length ? `Sent the details of "${project.title}" and ${project.sent.length === 1 ? '1 document' : `${project.sent.length} documents`}: ${project.sent.join(', ')}`
+        : `Sent the details of "${project.title}" (no documents yet)`
       break
     case 'contact':
-      summary = 'asked for contact details'
+      replied = 'Sent the contact details (phone, email, website)'
       await replyContact(m.from)
       break
     default:
-      summary = m.text ? `sent: ${clip(m.text, 300)}` : m.actionTitle ? `chose "${m.actionTitle}"` : `sent a ${m.type || 'message'}`
+      replied = 'Sent the welcome menu: Explore projects · Contact us'
       await replyWelcome(m.from)
   }
 
-  await recordInCrm(db, m, summary, project)
+  await recordInCrm(db, m, said, replied, project)
 }
 
 /** Handles a WhatsApp webhook payload. Never throws: one bad message must not block the others. */
