@@ -93,6 +93,9 @@ export const isFollowUpActivity = (type?: string | null) =>
   !!type && type.toLowerCase().startsWith('follow_up_')
 
 const ACTIVITY_LABELS: Record<string, string> = {
+  whatsapp_in: 'WhatsApp from customer',
+  whatsapp_out: 'WhatsApp bot reply',
+  whatsapp_message: 'WhatsApp bot',
   meta_form_submission: 'Form submitted',
   manual_enquiry: 'Enquiry added',
   sms_sent: 'SMS sent',
