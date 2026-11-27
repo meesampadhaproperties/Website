@@ -27,7 +27,31 @@ export function whatsappCredentialsConfigured(): boolean {
   return !!process.env.WHATSAPP_ACCESS_TOKEN && !!process.env.WHATSAPP_PHONE_NUMBER_ID
 }
 
+/** What the bot actually sent during the current customer message, per phone number (shown in the CRM chat). */
+const outboxes = new Map<string, string[]>()
+
+/** The text of a sent message, exactly as the customer sees it. */
+function sentText(payload: any): string {
+  if (payload?.type === 'text') return String(payload.text?.body || '')
+  if (payload?.type === 'document') return `📄 ${payload.document?.filename || 'Document'}`
+  if (payload?.type === 'interactive') {
+    const i = payload.interactive || {}
+    const body = String(i.body?.text || '')
+    const items = i.type === 'list'
+      ? (i.action?.sections || []).flatMap((sec: any) => (sec.rows || []).map((r: any) => r.title))
+      : (i.action?.buttons || []).map((b: any) => b.reply?.title)
+    return [body, ...items.map((t: string) => `[ ${t} ]`)].filter(Boolean).join('\n')
+  }
+  return ''
+}
+
 async function sendRaw(to: string, payload: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
+  const result = await sendRawInner(to, payload)
+  if (result.ok) outboxes.get(to)?.push(sentText(payload))
+  return result
+}
+
+async function sendRawInner(to: string, payload: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch(`${META_GRAPH_BASE_URL}/${encodeURIComponent(process.env.WHATSAPP_PHONE_NUMBER_ID as string)}/messages`, {
       method: 'POST',
@@ -166,7 +190,7 @@ async function replyProject(to: string, projectId: string): Promise<{ title: str
 // ---------------------------------------------------------------- CRM lead
 
 /** Saves the person as a lead (one lead per phone number) and writes what they did in the lead's history. */
-async function recordInCrm(db: any, m: WaIncoming, said: string, replied: string, project?: { title: string; crmProjectId: string | null } | null) {
+async function recordInCrm(db: any, m: WaIncoming, said: string, replies: string[], project?: { title: string; crmProjectId: string | null } | null) {
   const phone = canonicalPhoneNumber(m.from)
   const now = new Date().toISOString()
   const [existing] = await findLeadsByPhone(db, phone, 'id, name, enquiry_count, last_enquiry_at, enquiry_projects', 1)
@@ -211,10 +235,14 @@ async function recordInCrm(db: any, m: WaIncoming, said: string, replied: string
   // Both sides of the chat, in order: what the customer sent (at the time they sent it), then the bot's reply
   const nowMs = Date.now()
   const sentAt = m.timestamp && m.timestamp * 1000 < nowMs ? m.timestamp * 1000 : nowMs - 1000
-  await db.from('lead_activities').insert([
+  const rows: Record<string, unknown>[] = [
     { lead_id: leadId, activity_type: 'whatsapp_in', description: said, metadata: { wa_message_id: m.id, from: m.from, type: m.type }, created_at: new Date(sentAt).toISOString() },
-    { lead_id: leadId, activity_type: 'whatsapp_out', description: replied, metadata: { reply_to: m.id }, created_at: new Date(Math.max(nowMs, sentAt + 1)).toISOString() },
-  ])
+  ]
+  replies.forEach((text, i) => rows.push({
+    lead_id: leadId, activity_type: 'whatsapp_out', description: text, metadata: { reply_to: m.id },
+    created_at: new Date(Math.max(nowMs, sentAt + 1) + i).toISOString(),
+  }))
+  await db.from('lead_activities').insert(rows)
 }
 
 // ---------------------------------------------------------------- entry point
@@ -228,34 +256,32 @@ async function handleMessage(m: WaIncoming) {
   if (m.timestamp && Date.now() / 1000 - m.timestamp > MAX_MESSAGE_AGE_SECONDS) return
 
   const action = routeAction(m)
-  // What the customer did, in plain words for the CRM chat view
-  const said = m.text ? clip(m.text, 1000)
-    : m.actionTitle ? `Tapped "${m.actionTitle}"`
-    : `Sent ${/^[aeiou]/i.test(m.type) ? 'an' : 'a'} ${m.type || 'message'}`
-  let replied: string
+  // Exactly what the customer typed, or the button they tapped
+  const said = m.text ? clip(m.text, 1000) : m.actionTitle || `[${m.type || 'message'}]`
   let project: { title: string; crmProjectId: string | null; sent: string[] } | null = null
 
-  switch (action.kind) {
-    case 'explore':
-      replied = action.page > 1 ? `Sent the projects list (page ${action.page})` : 'Sent the projects list'
-      await replyProjectList(m.from, action.page)
-      break
-    case 'project':
-      project = await replyProject(m.from, action.id)
-      replied = !project ? 'That project is no longer available. Sent the projects list again.'
-        : project.sent.length ? `Sent ${project.sent.length === 1 ? '1 document' : `${project.sent.length} documents`} of "${project.title}": ${project.sent.join(', ')}`
-        : `"${project.title}" has no documents yet (told the customer they are coming soon)`
-      break
-    case 'contact':
-      replied = 'Sent the contact details (phone, email, website)'
-      await replyContact(m.from)
-      break
-    default:
-      replied = 'Sent the welcome menu: Explore projects · Contact us'
-      await replyWelcome(m.from)
+  outboxes.set(m.from, [])
+  let replies: string[] = []
+  try {
+    switch (action.kind) {
+      case 'explore':
+        await replyProjectList(m.from, action.page)
+        break
+      case 'project':
+        project = await replyProject(m.from, action.id)
+        break
+      case 'contact':
+        await replyContact(m.from)
+        break
+      default:
+        await replyWelcome(m.from)
+    }
+  } finally {
+    replies = outboxes.get(m.from) || []
+    outboxes.delete(m.from)
   }
 
-  await recordInCrm(db, m, said, replied, project)
+  await recordInCrm(db, m, said, replies, project)
 }
 
 /** Handles a WhatsApp webhook payload. Never throws: one bad message must not block the others. */
